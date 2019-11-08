@@ -415,6 +415,19 @@ py_class!(class PyOxidizerFinder |py| {
 
     // End of importlib.abc.InspectLoader interface.
 
+    def package_list(&self) -> PyResult<PyObject> {
+        let known_modules = self.known_modules(py);
+        let mut names = Vec::with_capacity(known_modules.len());
+
+        for name in known_modules.keys() {
+            names.push(name.to_py_object(py));
+        }
+
+        let names_list = names.to_py_object(py);
+
+        Ok(names_list.as_object().clone_ref(py))
+    }
+
     // Support obtaining ResourceReader instances.
     def get_resource_reader(&self, fullname: &PyString) -> PyResult<PyObject> {
         let key = fullname.to_string(py)?;
