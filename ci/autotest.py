@@ -32,9 +32,6 @@ skip_test_modules = set([
     "test.test_importlib.test_namespace_pkgs",
     "test.test_importlib.test_resource",
     "test.test_importlib.extension.test_finder",
-
-    # temp addition
-    "test.test_importlib",
 ])
 
 cpython_root = './build/target/x86_64-unknown-linux-gnu/debug/pyoxidizer/python.608871543e6d/python/install/lib/python3.7/'
@@ -596,6 +593,7 @@ test_skip_sets = {
     'forced skip functions': func_skip,
     "traceback style": {
         'test_concurrent_futures': ['ProcessPoolExecutorTest.test_traceback'],
+        'test_pydoc': ['TestDescriptions.test_typing_pydoc'],
         'test_traceback': [
             'PyExcReportingTests.test_cause',
             'PyExcReportingTests.test_cause_and_context',
@@ -671,6 +669,8 @@ test_skip_set_modules = [
 
 import_hooks.add_after_import_hook(test_skip_set_modules, doctor_module)
 
+import_hooks.ignore_del_missing_modules(['spam'])
+
 import test.support
 test.support.check_sizeof = lambda *args, **kwargs: raise_skip('testcapi missing')
 test.support.run_in_subinterp = lambda *args, **kwargs: raise_skip('testcapi missing')
@@ -686,7 +686,7 @@ from test.libregrtest import main
 
 try:
     main(
-        #['test_urllib2'],  #, 'test_multiprocessing_forkserver', 'test_json', 'test_lib2to3', 'test_tools'],  #, 'test_idle', 'test_import', 'test_importlib'],
+        #['test_importlib'],  #, 'test_multiprocessing_forkserver', 'test_json', 'test_lib2to3', 'test_tools'],  #, 'test_idle', 'test_import', 'test_importlib'],
         #["ctypes.test"],
         #["lib2to3.tests"],
         verbose2=True,
