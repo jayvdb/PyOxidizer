@@ -20,6 +20,12 @@ path = "src/lib.rs"
 [build-dependencies]
 vergen = "3"
 
+# Contains fixes needed for Linux and macOS
+[dependencies.object]
+git = "https://github.com/philipc/object.git"
+branch = "common"
+features = ["read", "std", "write"]
+
 [dependencies]
 byteorder = "1.2"
 cargo_toml = "0.6"
