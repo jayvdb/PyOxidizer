@@ -1873,6 +1873,10 @@ pub fn process_config(
 
     let config = &context.config;
     let dest_dir = &context.pyoxidizer_artifacts_path;
+    // Write a file containing the cargo metadata lines. This allows those
+    // lines to be consumed elsewhere and re-emitted without going through all the
+    // logic in this function.
+    let cargo_metadata_path = Path::new(&dest_dir).join("cargo_metadata.txt");
 
     warn!(
         logger,
@@ -1883,6 +1887,11 @@ pub fn process_config(
     cargo_metadata.push(format!(
         "cargo:rerun-if-changed={}",
         config.config_path.display()
+    ));
+
+    cargo_metadata.push(format!(
+        "cargo:rerun-if-changed={}",
+        cargo_metadata_path.display()
     ));
 
     if !dest_dir.exists() {
@@ -2040,10 +2049,6 @@ pub fn process_config(
         dest_path.display()
     ));
 
-    // Write a file containing the cargo metadata lines. This allows those
-    // lines to be consumed elsewhere and re-emitted without going through all the
-    // logic in this function.
-    let cargo_metadata_path = Path::new(&dest_dir).join("cargo_metadata.txt");
     fs::write(&cargo_metadata_path, cargo_metadata.join("\n").as_bytes())
         .expect("unable to write cargo_metadata.txt");
 
