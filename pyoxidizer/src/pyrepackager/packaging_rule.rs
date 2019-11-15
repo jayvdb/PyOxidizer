@@ -909,21 +909,29 @@ fn resolve_pip_requirements_file(
     let target_dir_s = target_dir_path.display().to_string();
     warn!(logger, "pip installing to {}", target_dir_s);
 
-    let mut args = vec!["-m", "pip", "--disable-pip-version-check"];
+    let mut pip_args: Vec<String> = vec![
+        "-m".to_string(),
+        "pip".to_string(),
+        "--disable-pip-version-check".to_string(),
+    ];
 
     if verbose {
-        args.push("--verbose");
+        pip_args.push("--verbose".to_string());
     }
 
-    args.extend(&[
-        "install",
-        "--target",
-        &target_dir_s,
-        "--no-binary",
-        ":all:",
-        "--requirement",
-        &rule.requirements_path,
+    pip_args.extend(vec![
+        "install".to_string(),
+        "--target".to_string(),
+        target_dir_s,
+        "--no-binary".to_string(),
+        ":all:".to_string(),
+        "--requirement".to_string(),
+        rule.requirements_path.clone(),
     ]);
+
+    if rule.extra_args.is_some() {
+        pip_args.extend(rule.extra_args.clone().unwrap());
+    }
 
     for (key, value) in rule.extra_env.iter() {
         extra_envs.insert(key.clone(), value.clone());
@@ -931,7 +939,7 @@ fn resolve_pip_requirements_file(
 
     // TODO send stderr to stdout.
     let mut cmd = std::process::Command::new(&dist.python_exe)
-        .args(&args)
+        .args(&pip_args)
         .envs(&extra_envs)
         .stdout(std::process::Stdio::piped())
         .spawn()

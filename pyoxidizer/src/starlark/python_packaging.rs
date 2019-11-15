@@ -580,13 +580,15 @@ starlark_module! { python_packaging_env =>
         extra_env=None,
         optimize_level=0,
         include_source=true,
-        install_location="embedded"
+        install_location="embedded",
+        extra_args=None
     ) {
         let requirements_path = required_str_arg("path", &requirements_path)?;
         optional_dict_arg("extra_env", "string", "string", &extra_env)?;
         required_type_arg("optimize_level", "int", &optimize_level)?;
         let include_source = required_bool_arg("include_source", &include_source)?;
         let install_location = required_str_arg("install_location", &install_location)?;
+        optional_list_arg("extra_args", "string", &extra_args)?;
 
         let extra_env = match extra_env.get_type() {
             "dict" => extra_env.into_iter()?.map(|key| {
@@ -606,6 +608,11 @@ starlark_module! { python_packaging_env =>
                 label: e.to_string(),
             }.into())
         })?;
+        let extra_args = match extra_args.get_type() {
+            "list" => Some(extra_args.into_iter()?.map(|x| x.to_string()).collect()),
+            "NoneType" => None,
+            _ => panic!("should have validated type above"),
+        };
 
         let rule = PackagingPipRequirementsFile {
             requirements_path,
@@ -613,6 +620,7 @@ starlark_module! { python_packaging_env =>
             optimize_level,
             include_source,
             install_location,
+            extra_args,
         };
 
         Ok(Value::new(PipRequirementsFile { rule }))
@@ -893,6 +901,7 @@ mod tests {
             optimize_level: 0,
             include_source: true,
             install_location: InstallLocation::Embedded,
+            extra_args: None,
         };
 
         v.downcast_apply(|x: &PipRequirementsFile| assert_eq!(x.rule, wanted));
