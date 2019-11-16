@@ -225,7 +225,14 @@ class UnixCCompiler(CCompiler):
                            ):
 
         if 'PYOXIDIZER_DISTUTILS_STATE_DIR' not in os.environ:
-            raise Exception('PYOXIDIZER_DISTUTILS_STATE_DIR not defined')
+            base = __file__[:-len('packages/distutils/unixccompiler.py')]
+            dest_path = os.path.join(base, 'pyoxidizer-build-state/')
+            if not os.path.exists(dest_path):
+                 os.mkdir(dest_path)
+        else:
+            dest_path = os.environ['PYOXIDIZER_DISTUTILS_STATE_DIR']
+
+        print('PYOXIDIZER_DISTUTILS_STATE_DIR = {}'.format(dest_path), file=sys.stderr)
 
         self.link(CCompiler.SHARED_OBJECT, objects,
                   output_filename, output_dir,
@@ -236,7 +243,6 @@ class UnixCCompiler(CCompiler):
         # In addition to performing the requested link, we also write out
         # files that PyOxidizer can use to embed the extension in a larger
         # binary.
-        dest_path = os.environ['PYOXIDIZER_DISTUTILS_STATE_DIR']
 
         # We need to copy the object files because they may be in a temp
         # directory that doesn't outlive this process.
@@ -260,6 +266,7 @@ class UnixCCompiler(CCompiler):
             }
             json.dump(data, fh, indent=4, sort_keys=True)
 
+        print('Wrote {}'.format(json_path), file=sys.stderr)
 
     # -- Miscellaneous methods -----------------------------------------
     # These are all used by the 'gen_lib_options() function, in

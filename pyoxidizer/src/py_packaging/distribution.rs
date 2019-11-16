@@ -5,11 +5,11 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use slog::warn;
+use slog::{info, warn};
 use std::collections::BTreeMap;
 use std::fs;
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use url::Url;
 
@@ -338,7 +338,7 @@ impl PythonDistributionInfo {
     }
 
     /// Ensure pip is available to run in the distribution.
-    pub fn ensure_pip(&self) -> PathBuf {
+    pub fn ensure_pip(&self, logger: &slog::Logger) -> PathBuf {
         let pip_path = self
             .python_exe
             .parent()
@@ -347,12 +347,19 @@ impl PythonDistributionInfo {
             .join(PIP_EXE_BASENAME);
 
         if !pip_path.exists() {
+            info!(logger, "running {} -m ensurepip", self.python_exe.display());
             std::process::Command::new(&self.python_exe)
                 .args(&["-m", "ensurepip"])
                 .status()
                 .expect("failed to run ensurepip");
         }
 
+        /*warn!(logger, "installing wheel and upgrading setuptools");
+        std::process::Command::new(&self.python_exe)
+            .args(&["-m", "pip", "install", "--ignore-installed", "wheel", "setuptools"])
+            .status()
+            .expect("failed to install wheel");
+*/
         pip_path
     }
 
@@ -435,6 +442,41 @@ impl PythonDistributionInfo {
         }
 
         res
+    }
+
+    /// Create a venv from the distribution at path.
+    pub fn create_venv(&self, logger: &slog::Logger, path: &PathBuf) -> PathBuf {
+        let venv_dir_s = path.display().to_string();
+
+        if path.exists() {
+            panic!("path {} already exists", venv_dir_s);
+        }
+
+        warn!(logger, "creating venv {}", venv_dir_s);
+
+        let args: Vec<String> = vec![
+            "-m".to_string(),
+            "venv".to_string(),
+            venv_dir_s.clone(),
+        ];
+
+        info!(logger, "Running {} {}", self.python_exe.display(), args.join(" "));
+
+        let mut cmd = std::process::Command::new(&self.python_exe)
+            .args(&args)
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("error running venv");
+        {
+            let stdout = cmd.stdout.as_mut().unwrap();
+            let reader = BufReader::new(stdout);
+
+            for line in reader.lines() {
+                warn!(logger, "{}", line.unwrap());
+            }
+       }
+
+       path.canonicalize().unwrap()
     }
 }
 

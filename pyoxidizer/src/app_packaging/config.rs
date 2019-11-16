@@ -100,6 +100,7 @@ pub struct PackagingPipInstallSimple {
 pub struct PackagingPipRequirementsFile {
     // TODO resolve to a PathBuf.
     pub requirements_path: String,
+    pub venv_path: Option<String>,
     pub extra_env: HashMap<String, String>,
     pub optimize_level: i64,
     pub include_source: bool,

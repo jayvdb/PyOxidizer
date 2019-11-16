@@ -563,7 +563,13 @@ class MSVCCompiler(CCompiler) :
                            ):
 
         if 'PYOXIDIZER_DISTUTILS_STATE_DIR' not in os.environ:
-            raise Exception('PYOXIDIZER_DISTUTILS_STATE_DIR not defined')
+            base = __file__[:-len('packages/distutils/_msvccompiler.py')]
+            dest_path = os.path.join(base, 'pyoxidizer-build-state/')
+            if not os.path.exists(dest_path):
+                 os.mkdir(dest_path)
+        else:
+            dest_path = os.environ['PYOXIDIZER_DISTUTILS_STATE_DIR']
+
 
         # The extension is compiled as a built-in, so linking a shared library
         # won't work due to symbol visibility/export issues. The extension is
@@ -581,6 +587,8 @@ class MSVCCompiler(CCompiler) :
         # files that PyOxidizer can use to embed the extension in a larger
         # binary.
         dest_path = os.environ['PYOXIDIZER_DISTUTILS_STATE_DIR']
+
+        print('PYOXIDIZER_DISTUTILS_STATE_DIR = {}'.format(dest_path), file=sys.stderr)
 
         # We need to copy the object files because they may be in a temp
         # directory that doesn't outlive this process.
@@ -604,6 +612,7 @@ class MSVCCompiler(CCompiler) :
             }
             json.dump(data, fh, indent=4, sort_keys=True)
 
+        print('Wrote {}'.format(json_path), file=sys.stderr)
 
     # -- Miscellaneous methods -----------------------------------------
     # These are all used by the 'gen_lib_options() function, in
