@@ -2,22 +2,32 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+use copy_dir::copy_dir;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use slog::warn;
-use std::collections::BTreeMap;
+use slog::{info, warn};
+use std::collections::{BTreeMap, HashMap};
+use std::env;
 use std::fs;
 use std::fs::{create_dir_all, File};
-use std::io::{Cursor, Read};
+use std::io::{BufRead, BufReader, Cursor, Read};
 use std::path::{Path, PathBuf};
 use url::Url;
 
+use super::distutils::prepare_hacked_distutils;
 use super::fsscan::{
     find_python_resources, is_package_from_path, walk_tree_files, PythonFileResource,
 };
 use super::resource::{PythonResource, ResourceData, SourceModule};
+
 use crate::licensing::NON_GPL_LICENSES;
+
+#[cfg(windows)]
+const PYTHON_EXE_BASENAME: &str = "python3.exe";
+
+#[cfg(unix)]
+const PYTHON_EXE_BASENAME: &str = "python3";
 
 #[cfg(windows)]
 const PIP_EXE_BASENAME: &str = "pip3.exe";
@@ -309,6 +319,9 @@ pub struct ParsedPythonDistribution {
 
     /// Describes license info for things in this distribution.
     pub license_infos: BTreeMap<String, Vec<LicenseInfo>>,
+
+    /// Path to copy of hacked dist to use for packaging rules venvs
+    pub venv_base: PathBuf,
 }
 
 #[derive(Debug)]
@@ -329,6 +342,48 @@ pub enum ExtensionModuleFilter {
     All,
     NoLibraries,
     NoGPL,
+}
+
+pub struct PythonPaths {
+    pub prefix: PathBuf,
+    pub bin_dir: PathBuf,
+    pub python_exe: PathBuf,
+    pub stdlib: PathBuf,
+    pub site_packages: PathBuf,
+    pub pyoxidizer_state_dir: PathBuf,
+}
+
+/// Resolve the location of Python modules given a base install path.
+pub fn resolve_python_paths(base: &Path, python_version: &str, is_windows: bool) -> PythonPaths {
+    let prefix = base.to_path_buf();
+
+    let mut p = prefix.clone();
+
+    let bin_dir = p.join("bin");
+
+    let python_exe = bin_dir.join(PYTHON_EXE_BASENAME);
+
+    let pyoxidizer_state_dir = p.join("state/pyoxidizer");
+
+    if is_windows {
+        p.push("Lib");
+    } else {
+        p.push("lib");
+        p.push(format!("python{}", &python_version[0..3]));
+    }
+
+    let stdlib = p.clone();
+
+    let site_packages = p.join("site-packages");
+
+    PythonPaths {
+        prefix,
+        bin_dir,
+        python_exe,
+        stdlib,
+        site_packages,
+        pyoxidizer_state_dir,
+    }
 }
 
 impl ParsedPythonDistribution {
@@ -360,7 +415,7 @@ impl ParsedPythonDistribution {
     }
 
     /// Ensure pip is available to run in the distribution.
-    pub fn ensure_pip(&self) -> PathBuf {
+    pub fn ensure_pip(&self, logger: &slog::Logger) -> PathBuf {
         let pip_path = self
             .python_exe
             .parent()
@@ -369,6 +424,7 @@ impl ParsedPythonDistribution {
             .join(PIP_EXE_BASENAME);
 
         if !pip_path.exists() {
+            info!(logger, "running {} -m ensurepip", self.python_exe.display());
             std::process::Command::new(&self.python_exe)
                 .args(&["-m", "ensurepip"])
                 .status()
@@ -376,6 +432,152 @@ impl ParsedPythonDistribution {
         }
 
         pip_path
+    }
+
+    /// Duplicate the python distribution, with distutils hacked
+    pub fn create_hacked_base(&self, logger: &slog::Logger) -> PythonPaths {
+        let dist_prefix = self.base_dir.join("python").join("install");
+        let venv_base = self.venv_base.clone();
+
+        let dist_prefix_s = dist_prefix.display().to_string();
+        let venv_dir_s = self.venv_base.display().to_string();
+
+        self.ensure_pip(logger);
+
+        if !venv_base.exists() {
+            warn!(
+                logger,
+                "copying {} to create hacked base {}", dist_prefix_s, venv_dir_s
+            );
+            copy_dir(&dist_prefix, &venv_base).unwrap();
+
+            // Provide a reliable mtime
+            File::create(&venv_base.join(".timestamp")).unwrap(); //.sync_all();
+        }
+
+        let python_paths = resolve_python_paths(&venv_base, &self.version, self.os == "windows");
+
+        prepare_hacked_distutils(logger, &python_paths);
+
+        python_paths
+    }
+
+    /// Create a venv from the distribution at path.
+    pub fn create_venv(&self, logger: &slog::Logger, path: &PathBuf) -> PythonPaths {
+        let venv_dir_s = path.display().to_string();
+
+        let venv_python_paths = resolve_python_paths(&path, &self.version, self.os == "windows");
+
+        // This will recreate it, if it was deleted
+        let python_paths = self.create_hacked_base(&logger);
+
+        if path.exists() {
+            warn!(logger, "re-using venv {}", venv_dir_s);
+            return venv_python_paths;
+        }
+
+        warn!(logger, "creating venv {}", venv_dir_s);
+
+        // The venv needs to use --copies otherwise setuptools build_ext
+        // breaks out of the venv and uses the dist build_ext which is not hacked.
+        let args: Vec<String> = vec![
+            "-m".to_string(),
+            "venv".to_string(),
+            //"--copies".to_string(),
+            venv_dir_s.clone(),
+        ];
+
+        info!(
+            logger,
+            "Running {} {}",
+            python_paths.python_exe.display(),
+            args.join(" ")
+        );
+
+        let mut cmd = std::process::Command::new(&python_paths.python_exe)
+            .args(&args)
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("error running venv");
+        {
+            let stdout = cmd.stdout.as_mut().unwrap();
+            let reader = BufReader::new(stdout);
+
+            for line in reader.lines() {
+                warn!(logger, "{}", line.unwrap());
+            }
+        }
+
+        venv_python_paths
+    }
+
+    /// Create or re-use an existing venv
+    pub fn prepare_venv(
+        &self,
+        logger: &slog::Logger,
+        venv_path: Option<&String>,
+    ) -> (PythonPaths, HashMap<String, String>) {
+        let venv_dir_path = match venv_path {
+            Some(path_str) => PathBuf::from(path_str),
+            None => tempdir::TempDir::new("pyoxidizer-temp-venv")
+                .expect("could not create temp directory")
+                .path()
+                .join("venv"),
+        };
+
+        let python_paths = self.create_venv(logger, &venv_dir_path);
+
+        let mut extra_envs = HashMap::new();
+
+        let prefix_s = python_paths
+            .prefix
+            .canonicalize()
+            .unwrap()
+            .display()
+            .to_string();
+
+        let venv_path_bin_s = python_paths
+            .bin_dir
+            .canonicalize()
+            .unwrap()
+            .display()
+            .to_string();
+
+        let path_separator = if cfg!(windows) { ";" } else { ":" };
+
+        let process_path_s = env::var("PATH").unwrap();
+
+        extra_envs.insert(
+            "PATH".to_string(),
+            format!("{}{}{}", venv_path_bin_s, path_separator, process_path_s),
+        );
+
+        extra_envs.insert("VIRTUAL_ENV".to_string(), prefix_s.clone());
+        extra_envs.insert(
+            "PYTHONPATH".to_string(),
+            python_paths
+                .site_packages
+                .canonicalize()
+                .unwrap()
+                .display()
+                .to_string(),
+        );
+
+        fs::create_dir_all(&python_paths.pyoxidizer_state_dir).unwrap();
+
+        extra_envs.insert(
+            "PYOXIDIZER_DISTUTILS_STATE_DIR".to_string(),
+            python_paths
+                .pyoxidizer_state_dir
+                .canonicalize()
+                .unwrap()
+                .display()
+                .to_string(),
+        );
+
+        extra_envs.insert("PYOXIDIZER".to_string(), "1".to_string());
+
+        (python_paths, extra_envs)
     }
 
     /// Obtain resolved `SourceModule` instances for this distribution.
@@ -694,6 +896,8 @@ pub fn analyze_python_distribution_data(
         };
     }
 
+    let venv_base = dist_dir.parent().unwrap().join("hacked_base");
+
     Ok(ParsedPythonDistribution {
         flavor: pi.python_flavor.clone(),
         version: pi.python_version.clone(),
@@ -720,6 +924,7 @@ pub fn analyze_python_distribution_data(
         py_modules,
         resources,
         license_infos,
+        venv_base,
     })
 }
 

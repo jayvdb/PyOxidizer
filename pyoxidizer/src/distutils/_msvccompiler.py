@@ -582,6 +582,9 @@ class MSVCCompiler(CCompiler) :
         # binary.
         dest_path = os.environ['PYOXIDIZER_DISTUTILS_STATE_DIR']
 
+        if not os.path.exists(dest_path):
+             os.makedirs(dest_path)
+
         # We need to copy the object files because they may be in a temp
         # directory that doesn't outlive this process.
         object_paths = []
@@ -604,6 +607,7 @@ class MSVCCompiler(CCompiler) :
             }
             json.dump(data, fh, indent=4, sort_keys=True)
 
+        print('Wrote {}'.format(json_path), file=sys.stderr)
 
     # -- Miscellaneous methods -----------------------------------------
     # These are all used by the 'gen_lib_options() function, in
