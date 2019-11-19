@@ -4,9 +4,9 @@
 
 use lazy_static::lazy_static;
 use serde::Deserialize;
-use slog::warn;
+use slog::{info, warn};
 use std::collections::BTreeMap;
-use std::fs::{read_dir, read_to_string};
+use std::fs::{read_dir, read_to_string, File};
 use std::path::{Path, PathBuf};
 
 use filetime::FileTime;
@@ -20,15 +20,15 @@ lazy_static! {
         let mut res: BTreeMap<&'static str, &'static [u8]> = BTreeMap::new();
 
         res.insert(
-            "command/build_ext.py",
+            "distutils/command/build_ext.py",
             include_bytes!("../distutils/command/build_ext.py"),
         );
         res.insert(
-            "_msvccompiler.py",
+            "distutils/_msvccompiler.py",
             include_bytes!("../distutils/_msvccompiler.py"),
         );
         res.insert(
-            "unixccompiler.py",
+            "distutils/unixccompiler.py",
             include_bytes!("../distutils/unixccompiler.py"),
         );
 
@@ -56,26 +56,37 @@ pub fn prepare_hacked_distutils(logger: &slog::Logger, target: &PythonPaths) {
         target.stdlib.display()
     );
 
-    let dest_distutils_path = target.stdlib.join("distutils");
+    let dest_stdlib_path = target.stdlib.clone();
 
-    // The venv "pyvenv.cfg" is used as a proxy for the first hack
-    let src_metadata = fs::metadata(&target.prefix.join(".timestamp")).unwrap();
+    let ts_filename = target.prefix.join(".timestamp");
+    if !ts_filename.exists() {
+        // Provide a reliable mtime
+        File::create(&ts_filename).unwrap();
+    }
 
-    let src_mtime = FileTime::from_last_modification_time(&src_metadata);
+    let dir_metadata = fs::metadata(&ts_filename).unwrap();
+
+    let dir_mtime = FileTime::from_last_modification_time(&dir_metadata);
 
     for (path, data) in MODIFIED_DISTUTILS_FILES.iter() {
-        let dest_path = dest_distutils_path.join(path);
+        let mut dest_path = dest_stdlib_path.clone();
+        dest_path.extend(path.split("/"));
+        info!(logger, "checking {}", path);
+        if dest_path.exists() {
+            let dest_metadata = fs::metadata(dest_path.canonicalize().unwrap()).unwrap();
 
-        let dest_metadata = fs::metadata(dest_path.clone()).unwrap();
+            let dest_mtime = FileTime::from_last_modification_time(&dest_metadata);
 
-        let dest_mtime = FileTime::from_last_modification_time(&dest_metadata);
-
-        if src_mtime < dest_mtime {
-            warn!(logger, "not overwriting newer distutils/{}", path);
-            continue;
+            if dir_mtime < dest_mtime {
+                warn!(logger, "not overwriting newer {}", path);
+                continue;
+            }
+            warn!(logger, "modifying {} for oxidation", path);
+        } else {
+            let dest_dir = dest_path.parent().unwrap();
+            std::fs::create_dir_all(&dest_dir).unwrap();
+            warn!(logger, "installing missing {} for oxidation", path);
         }
-
-        warn!(logger, "modifying distutils/{} for oxidation", path);
         std::fs::write(dest_path, data).unwrap();
     }
 }

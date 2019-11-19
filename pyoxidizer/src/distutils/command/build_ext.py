@@ -6,6 +6,7 @@ extensions ASAP)."""
 
 import contextlib
 import os
+import pathlib
 import re
 import sys
 from distutils.core import Command
@@ -28,7 +29,6 @@ extension_name_re = re.compile \
 def show_compilers ():
     from distutils.ccompiler import show_compilers
     show_compilers()
-
 
 class build_ext(Command):
 
@@ -525,10 +525,6 @@ class build_ext(Command):
         for undef in ext.undef_macros:
             macros.append((undef,))
 
-        # This is needed to activate specific symbol visibility / linking
-        # behavior on Windows. It isn't needed on UNIX but should be harmless.
-        macros.append(('Py_BUILD_CORE_BUILTIN', '1'))
-
         objects = self.compiler.compile(sources,
                                          output_dir=self.build_temp,
                                          macros=macros,
@@ -557,6 +553,22 @@ class build_ext(Command):
         else:
             fn = self.compiler.link_shared_object
             extra_kwargs = {}
+
+        try:
+            base = pathlib.Path(sys.real_prefix)
+        except AttributeError:
+            base = pathlib.Path(sys.prefix)
+        if self.plat_name == 'win32':
+            pyox_libs = str(base)
+        else:
+            pyox_libs = str(base / 'lib')
+        if os.path.exists(pyox_libs):
+            if not ext.library_dirs:
+                ext.library_dirs = []
+            if pyox_libs not in ext.library_dirs:
+                ext.library_dirs.append(pyox_libs)
+
+        print("lib_dirs", ext.library_dirs, file=sys.stderr)
 
         fn(
             objects, ext_path,
