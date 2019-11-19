@@ -14,6 +14,10 @@ jobs:
         rustup_toolchain: 1.36.0
 
   steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.7'
+
   - ${{ if ne(parameters.name, 'Windows') }}:
     - script: |
         curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUSTUP_TOOLCHAIN
@@ -47,14 +51,34 @@ jobs:
     displayName: Clippy
     condition: ne( variables['rustup_toolchain'], 'nightly' )
 
-  - ${{ if ne(parameters.name, 'Windows') }}:
+  - ${{ if eq(parameters.name, 'Linux') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --python-code 'print("hello, world")' ~/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install cryptography --python-code 'import cryptography; print("hello, world")' ~/pyapp
+        cargo run --bin pyoxidizer -- run ~/pyapp
+      displayName: Build Oxidized Application
+
+  - ${{ if eq(parameters.name, 'macOS') }}:
+    - script: |
+        brew install openssl@1.1
+      displayName: 'Install OpenSSL'
+
+  - ${{ if eq(parameters.name, 'macOS') }}:
+    - script: |
+        export CPPFLAGS="-I$(brew --prefix openssl@1.1)/include"
+        export LDFLAGS="-L$(brew --prefix openssl@1.1)/lib"
+        cargo run --bin pyoxidizer -- init --pip-install cryptography --python-code 'import cryptography; print("hello, world")' ~/pyapp
         cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
 
   - ${{ if eq(parameters.name, 'Windows') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --python-code 'print("hello, world")' %HOME%/pyapp
-        cargo run --bin pyoxidizer -- run %HOME%/pyapp
+        choco install openssl
+      displayName: 'Install OpenSSL'
+
+  - ${{ if eq(parameters.name, 'Windows') }}:
+    - script: |
+        set INCLUDE=%ProgramFiles%\OpenSSL-Win64\include;%INCLUDE%
+        set LIB=%ProgramFiles%\OpenSSL-Win64\lib\;%LIB%
+        cargo run --bin pyoxidizer -- init --pip-install cryptography %HOME%/pyapp
+        cat ci/pyapp.py | cargo run --bin pyoxidizer -- --verbose run %HOME%/pyapp
       displayName: Build Oxidized Application (Windows)

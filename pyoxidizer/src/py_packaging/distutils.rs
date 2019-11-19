@@ -9,9 +9,6 @@ use std::collections::BTreeMap;
 use std::fs::{read_dir, read_to_string};
 use std::path::{Path, PathBuf};
 
-use filetime::FileTime;
-use std::fs;
-
 use super::distribution::PythonPaths;
 use super::resource::BuiltExtensionModule;
 
@@ -58,22 +55,8 @@ pub fn prepare_hacked_distutils(logger: &slog::Logger, target: &PythonPaths) {
 
     let dest_distutils_path = target.stdlib.join("distutils");
 
-    // The venv "pyvenv.cfg" is used as a proxy for the first hack
-    let src_metadata = fs::metadata(&target.prefix.join(".timestamp")).unwrap();
-
-    let src_mtime = FileTime::from_last_modification_time(&src_metadata);
-
     for (path, data) in MODIFIED_DISTUTILS_FILES.iter() {
         let dest_path = dest_distutils_path.join(path);
-
-        let dest_metadata = fs::metadata(dest_path.clone()).unwrap();
-
-        let dest_mtime = FileTime::from_last_modification_time(&dest_metadata);
-
-        if src_mtime < dest_mtime {
-            warn!(logger, "not overwriting newer distutils/{}", path);
-            continue;
-        }
 
         warn!(logger, "modifying distutils/{} for oxidation", path);
         std::fs::write(dest_path, data).unwrap();
