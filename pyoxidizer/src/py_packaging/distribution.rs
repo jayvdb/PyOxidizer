@@ -24,7 +24,7 @@ use super::resource::{PythonResource, ResourceData, SourceModule};
 use crate::licensing::NON_GPL_LICENSES;
 
 #[cfg(windows)]
-const PYTHON_EXE_BASENAME: &str = "python3.exe";
+const PYTHON_EXE_BASENAME: &str = "python.exe";
 
 #[cfg(unix)]
 const PYTHON_EXE_BASENAME: &str = "python3";
