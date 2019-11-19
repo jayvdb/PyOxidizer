@@ -47,14 +47,20 @@ jobs:
     displayName: Clippy
     condition: ne( variables['rustup_toolchain'], 'nightly' )
 
-  - ${{ if ne(parameters.name, 'Windows') }}:
+  - ${{ if eq(parameters.name, 'Linux') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --python-code 'print("hello, world")' ~/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install cryptography --python-code 'import cryptography; print("hello, world")' ~/pyapp
+        cargo run --bin pyoxidizer -- run ~/pyapp
+      displayName: Build Oxidized Application
+
+  - ${{ if eq(parameters.name, 'macOS') }}:
+    - script: |
+        cargo run --bin pyoxidizer -- init --pip-install bcrypt --python-code 'import bcrypt; print("hello, world")' ~/pyapp
         cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
 
   - ${{ if eq(parameters.name, 'Windows') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --python-code 'print("hello, world")' %HOME%/pyapp
-        cargo run --bin pyoxidizer -- run %HOME%/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install cryptography --python-code 'print("hello, world")' %HOME%/pyapp
+        cargo run --bin pyoxidizer -- --verbose run %HOME%/pyapp
       displayName: Build Oxidized Application (Windows)
