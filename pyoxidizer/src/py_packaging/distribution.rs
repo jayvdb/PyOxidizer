@@ -359,9 +359,17 @@ pub fn resolve_python_paths(base: &Path, python_version: &str, is_windows: bool)
 
     let mut p = prefix.clone();
 
-    let bin_dir = p.join("bin");
+    let bin_dir = if is_windows {
+        p.join("Scripts")
+    } else {
+        p.join("bin")
+    };
 
-    let python_exe = bin_dir.join(PYTHON_EXE_BASENAME);
+    let python_exe = if is_windows {
+        p.join(PYTHON_EXE_BASENAME)
+    } else {
+         bin_dir.join(PYTHON_EXE_BASENAME)
+    };
 
     let pyoxidizer_state_dir = p.join("state/pyoxidizer");
 
@@ -416,12 +424,9 @@ impl ParsedPythonDistribution {
 
     /// Ensure pip is available to run in the distribution.
     pub fn ensure_pip(&self, logger: &slog::Logger) -> PathBuf {
-        let pip_path = self
-            .python_exe
-            .parent()
-            .expect("could not derive parent")
-            .to_path_buf()
-            .join(PIP_EXE_BASENAME);
+        let python_paths = resolve_python_paths(&self.base_dir, &self.version, self.os == "windows");
+
+        let pip_path = python_paths.bin_dir.join(PIP_EXE_BASENAME);
 
         if !pip_path.exists() {
             info!(logger, "running {} -m ensurepip", self.python_exe.display());
