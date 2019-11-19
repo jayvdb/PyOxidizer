@@ -14,6 +14,7 @@ use std::fs::{create_dir_all, File};
 use std::io::{BufRead, BufReader, Cursor, Read};
 use std::path::{Path, PathBuf};
 use url::Url;
+use which::which;
 
 use super::distutils::prepare_hacked_distutils;
 use super::fsscan::{
@@ -354,35 +355,34 @@ pub struct PythonPaths {
 }
 
 /// Resolve the location of Python modules given a base install path.
-pub fn resolve_python_paths(base: &Path, python_version: &str, is_windows: bool) -> PythonPaths {
-    let prefix = base.to_path_buf();
+pub fn resolve_python_paths(base: &Path, python_version: &str) -> PythonPaths {
+    let prefix = base.to_path_buf().canonicalize().unwrap();
 
-    let mut p = prefix.clone();
+    let p = prefix.clone();
 
-    let bin_dir = if is_windows {
+    let bin_dir = if p.join("Scripts").exists() {
         p.join("Scripts")
     } else {
         p.join("bin")
     };
 
-    let python_exe = if is_windows {
-        p.join(PYTHON_EXE_BASENAME)
+    let python_exe = if bin_dir.join(PYTHON_EXE_BASENAME).exists() {
+        bin_dir.join(PYTHON_EXE_BASENAME)
     } else {
-         bin_dir.join(PYTHON_EXE_BASENAME)
+        p.join(PYTHON_EXE_BASENAME)
     };
 
-    let pyoxidizer_state_dir = p.join("state/pyoxidizer");
+    let pyoxidizer_state_dir = p.join("state").join("pyoxidizer");
 
-    if is_windows {
-        p.push("Lib");
+    let unix_lib_dir = p.join("lib").join(format!("python{}", &python_version[0..3]));
+
+    let stdlib = if unix_lib_dir.exists() {
+        unix_lib_dir.clone()
     } else {
-        p.push("lib");
-        p.push(format!("python{}", &python_version[0..3]));
-    }
+        p.join("Lib")
+    }.canonicalize().unwrap();
 
-    let stdlib = p.clone();
-
-    let site_packages = p.join("site-packages");
+    let site_packages = stdlib.join("site-packages");
 
     PythonPaths {
         prefix,
@@ -391,6 +391,52 @@ pub fn resolve_python_paths(base: &Path, python_version: &str, is_windows: bool)
         stdlib,
         site_packages,
         pyoxidizer_state_dir,
+    }
+}
+
+pub fn invoke_python(python_paths: &PythonPaths, logger: &slog::Logger, args: &[&str]) {
+    let mut site_packages_s = python_paths
+        .site_packages
+        .canonicalize()
+        .unwrap()
+        .display()
+        .to_string();
+
+    if site_packages_s.starts_with("\\\\?\\") {
+        site_packages_s = site_packages_s[4..].to_string();
+    }
+
+    info!(logger, "setting PYTHONPATH {}", site_packages_s);
+
+    let mut extra_envs = HashMap::new();
+    extra_envs.insert("PYTHONPATH".to_string(), site_packages_s);
+
+    info!(
+        logger,
+        "running {} {}",
+        python_paths.python_exe.display(),
+        args.join(" ")
+    );
+
+    let mut cmd = std::process::Command::new(&python_paths.python_exe.canonicalize().unwrap())
+        .args(args)
+        .envs(&extra_envs)
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect(
+            format!(
+                "failed to run {} {}",
+                python_paths.python_exe.display(),
+                args.join(" ")
+            )
+            .as_str(),
+        );
+    {
+        let stdout = cmd.stdout.as_mut().unwrap();
+        let reader = BufReader::new(stdout);
+        for line in reader.lines() {
+            warn!(logger, "{}", line.unwrap());
+        }
     }
 }
 
@@ -424,16 +470,14 @@ impl ParsedPythonDistribution {
 
     /// Ensure pip is available to run in the distribution.
     pub fn ensure_pip(&self, logger: &slog::Logger) -> PathBuf {
-        let python_paths = resolve_python_paths(&self.base_dir, &self.version, self.os == "windows");
+        let dist_prefix = self.base_dir.join("python").join("install");
+        let python_paths = resolve_python_paths(&dist_prefix, &self.version);
 
         let pip_path = python_paths.bin_dir.join(PIP_EXE_BASENAME);
 
         if !pip_path.exists() {
-            info!(logger, "running {} -m ensurepip", self.python_exe.display());
-            std::process::Command::new(&self.python_exe)
-                .args(&["-m", "ensurepip"])
-                .status()
-                .expect("failed to run ensurepip");
+            warn!(logger, "{} doesnt exist", pip_path.display().to_string());
+            invoke_python(&python_paths, &logger, &["-m", "ensurepip"]);
         }
 
         pip_path
@@ -441,26 +485,41 @@ impl ParsedPythonDistribution {
 
     /// Duplicate the python distribution, with distutils hacked
     pub fn create_hacked_base(&self, logger: &slog::Logger) -> PythonPaths {
-        let dist_prefix = self.base_dir.join("python").join("install");
         let venv_base = self.venv_base.clone();
 
-        let dist_prefix_s = dist_prefix.display().to_string();
         let venv_dir_s = self.venv_base.display().to_string();
 
-        self.ensure_pip(logger);
-
         if !venv_base.exists() {
-            warn!(
-                logger,
-                "copying {} to create hacked base {}", dist_prefix_s, venv_dir_s
-            );
-            copy_dir(&dist_prefix, &venv_base).unwrap();
+            if self.os == "windows" {
+                let external_python = which("python").unwrap().clone();
+                warn!(logger, "python={}", external_python.display().to_string());
+                // TODO: check python version
 
-            // Provide a reliable mtime
-            File::create(&venv_base.join(".timestamp")).unwrap(); //.sync_all();
+                let external_dist_prefix = external_python.parent().unwrap();
+
+                copy_dir(&external_dist_prefix, &venv_base).unwrap();
+
+                let external_dist_prefix_s = external_dist_prefix.display().to_string();
+                warn!(
+                    logger,
+                    "copied {} to create hacked base {}", external_dist_prefix_s, venv_dir_s
+                );
+            } else {
+                let dist_prefix = self.base_dir.join("python").join("install");
+
+                copy_dir(&dist_prefix, &venv_base).unwrap();
+
+                let dist_prefix_s = dist_prefix.display().to_string();
+                warn!(
+                    logger,
+                    "copied {} to create hacked base {}", dist_prefix_s, venv_dir_s
+                );
+            };
         }
 
-        let python_paths = resolve_python_paths(&venv_base, &self.version, self.os == "windows");
+        let python_paths = resolve_python_paths(&venv_base, &self.version);
+
+        invoke_python(&python_paths, &logger, &["-m", "ensurepip"]);
 
         prepare_hacked_distutils(logger, &python_paths);
 
@@ -471,49 +530,17 @@ impl ParsedPythonDistribution {
     pub fn create_venv(&self, logger: &slog::Logger, path: &PathBuf) -> PythonPaths {
         let venv_dir_s = path.display().to_string();
 
-        let venv_python_paths = resolve_python_paths(&path, &self.version, self.os == "windows");
-
         // This will recreate it, if it was deleted
         let python_paths = self.create_hacked_base(&logger);
 
         if path.exists() {
-            warn!(logger, "re-using venv {}", venv_dir_s);
-            return venv_python_paths;
+            warn!(logger, "re-using {} {}", "venv", venv_dir_s);
+        } else {
+            warn!(logger, "creating {} {}", "venv", venv_dir_s);
+            invoke_python(&python_paths, &logger, &["-m", "venv", venv_dir_s.as_str()]);
         }
 
-        warn!(logger, "creating venv {}", venv_dir_s);
-
-        // The venv needs to use --copies otherwise setuptools build_ext
-        // breaks out of the venv and uses the dist build_ext which is not hacked.
-        let args: Vec<String> = vec![
-            "-m".to_string(),
-            "venv".to_string(),
-            //"--copies".to_string(),
-            venv_dir_s.clone(),
-        ];
-
-        info!(
-            logger,
-            "Running {} {}",
-            python_paths.python_exe.display(),
-            args.join(" ")
-        );
-
-        let mut cmd = std::process::Command::new(&python_paths.python_exe)
-            .args(&args)
-            .stdout(std::process::Stdio::piped())
-            .spawn()
-            .expect("error running venv");
-        {
-            let stdout = cmd.stdout.as_mut().unwrap();
-            let reader = BufReader::new(stdout);
-
-            for line in reader.lines() {
-                warn!(logger, "{}", line.unwrap());
-            }
-        }
-
-        venv_python_paths
+        resolve_python_paths(&path, &self.version)
     }
 
     /// Create or re-use an existing venv
@@ -557,16 +584,18 @@ impl ParsedPythonDistribution {
             format!("{}{}{}", venv_path_bin_s, path_separator, process_path_s),
         );
 
-        extra_envs.insert("VIRTUAL_ENV".to_string(), prefix_s.clone());
-        extra_envs.insert(
-            "PYTHONPATH".to_string(),
-            python_paths
-                .site_packages
-                .canonicalize()
-                .unwrap()
-                .display()
-                .to_string(),
-        );
+        let mut site_packages_s = python_paths
+            .site_packages
+            .canonicalize()
+            .unwrap()
+            .display()
+            .to_string();
+        if site_packages_s.starts_with("\\\\?\\") {
+            site_packages_s = site_packages_s[4..].to_string();
+        }
+
+        extra_envs.insert("VIRTUAL_ENV".to_string(), prefix_s);
+        extra_envs.insert("PYTHONPATH".to_string(), site_packages_s);
 
         fs::create_dir_all(&python_paths.pyoxidizer_state_dir).unwrap();
 
