@@ -571,11 +571,11 @@ class MSVCCompiler(CCompiler) :
         # which they won't be for a shared library. PyOxidizer doesn't use the
         # library anyway (at least not yet), so don't even bother with any
         # linking.
-        #self.link(CCompiler.SHARED_OBJECT, objects,
-        #          output_filename, output_dir,
-        #          libraries, library_dirs, runtime_library_dirs,
-        #          export_symbols, debug,
-        #          extra_preargs, extra_postargs, build_temp, target_lang)
+        self.link(CCompiler.SHARED_OBJECT, objects,
+                  output_filename, output_dir,
+                  libraries, library_dirs, runtime_library_dirs,
+                  export_symbols, debug,
+                  extra_preargs, extra_postargs, build_temp, target_lang)
 
         # In addition to performing the requested link, we also write out
         # files that PyOxidizer can use to embed the extension in a larger
