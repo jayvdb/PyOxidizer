@@ -55,6 +55,7 @@ jobs:
 
   - ${{ if eq(parameters.name, 'Windows') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --python-code 'print("hello, world")' %HOME%/pyapp
-        cargo run --bin pyoxidizer -- run %HOME%/pyapp
+        echo $HOME $USERPROFILE
+        cargo run --bin pyoxidizer -- init $HOME/pyapp
+        echo 'print("hello, world")' | cargo run --bin pyoxidizer -- run $HOME/pyapp
       displayName: Build Oxidized Application (Windows)
