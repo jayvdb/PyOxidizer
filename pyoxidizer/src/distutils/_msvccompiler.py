@@ -588,8 +588,9 @@ class MSVCCompiler(CCompiler) :
         object_paths = []
         for i, o in enumerate(objects):
             with open(o, 'rb') as f:
-                magic = f.read(8)
-                print('{} magic {!r}'.format(o, magic))
+                data = f.read()
+            magic = data[0:8]
+            print('{} len %d, magic {!r}'.format(o, len(data), magic))
             p = os.path.join(dest_path, '%s.%d.o' % (name, i))
             shutil.copyfile(o, p)
             object_paths.append(p)
@@ -608,7 +609,8 @@ class MSVCCompiler(CCompiler) :
             }
             json.dump(data, fh, indent=4, sort_keys=True)
 
-        print('Wrote {}'.format(json_path), file=sys.stderr)
+        print('Wrote {}:'.format(json_path), file=sys.stderr)
+        print('   {!r}'.format(data), file=sys.stderr)
         for object_filename in object_paths:
             with open(object_filename, 'rb') as f:
                 magic = f.read(8)
