@@ -353,7 +353,7 @@ pub fn link_libpython(
         for (i, object_data) in em.object_file_data.iter().enumerate() {
             let out_path = temp_dir_path.join(format!("{}.{}.o", name, i));
 
-            if i == em.object_file_data.len() - 1 && ambiguous_init_fns.contains(&em.init_fn) {
+            if ambiguous_init_fns.contains(&em.init_fn) {
                 match rename_init(logger, name, object_data) {
                     Ok(val) => fs::write(&out_path, val).expect("unable to write object file"),
                     Err(_) => {

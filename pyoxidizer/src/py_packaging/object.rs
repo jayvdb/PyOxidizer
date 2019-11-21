@@ -42,6 +42,10 @@ pub fn rename_init(
                 object_data[1],
                 object_data[2],
                 object_data[3],
+                object_data[4],
+                object_data[5],
+                object_data[6],
+                object_data[7],
             ];
             warn!(
                 logger,
