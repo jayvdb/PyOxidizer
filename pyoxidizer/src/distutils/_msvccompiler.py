@@ -587,6 +587,9 @@ class MSVCCompiler(CCompiler) :
         # directory that doesn't outlive this process.
         object_paths = []
         for i, o in enumerate(objects):
+            with open(o, 'rb') as f:
+                magic = f.read(8)
+                print('{} magic {!r}'.format(o, magic))
             p = os.path.join(dest_path, '%s.%d.o' % (name, i))
             shutil.copyfile(o, p)
             object_paths.append(p)
