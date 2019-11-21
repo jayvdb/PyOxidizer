@@ -14,7 +14,7 @@ jobs:
         rustup_toolchain: 1.36.0
 
   steps:
-  - ${{ if ne(parameters.name, 'Windows') }}:
+  - ${{ if not(startsWith(parameters.name, 'Windows')) }}:
     - script: |
         curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUSTUP_TOOLCHAIN
         echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
@@ -47,7 +47,7 @@ jobs:
     displayName: Clippy
     condition: ne( variables['rustup_toolchain'], 'nightly' )
 
-  - ${{ if ne(parameters.name, 'Windows') }}:
+  - ${{ if not(startsWith(parameters.name, 'Windows')) }}:
     - script: |
         cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --python-code 'import markupsafe; import simplejson; print("hello, world")' ~/pyapp
         cargo run --bin pyoxidizer -- run ~/pyapp
