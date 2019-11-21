@@ -53,7 +53,7 @@ pub fn rename_init(
         "Parsing compiled object for {} (magic {:x?})", name, magic
     );
 
-    let in_object = object::File::parse(object_data).unwrap();
+    let in_object = object::File::parse(&object_data[6..]).unwrap();
 
     let mut out_object = write::Object::new(in_object.format(), in_object.architecture());
     out_object.mangling = write::Mangling::None;
