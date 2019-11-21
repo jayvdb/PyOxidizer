@@ -22,7 +22,7 @@ vergen = "3"
 
 [dependencies.object]
 git = "https://github.com/jayvdb/object.git"
-rev = "0be612c"
+branch = "winobj"
 features = ["read", "std", "write"]
 
 [dependencies]

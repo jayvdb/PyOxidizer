@@ -34,26 +34,26 @@ pub fn rename_init(
 
     let name_prefix = name.split('.').next().unwrap();
 
-    let in_object = match object::File::parse(object_data) {
-        Ok(object) => object,
-        Err(err) => {
-            let magic = [
-                object_data[0],
-                object_data[1],
-                object_data[2],
-                object_data[3],
-                object_data[4],
-                object_data[5],
-                object_data[6],
-                object_data[7],
-            ];
-            warn!(
-                logger,
-                "Failed to parse compiled object for {} (magic {:x?}): {}", name, magic, err
-            );
-            return Err(NoRewriteError);
-        }
-    };
+    let magic = [
+        object_data[0],
+        object_data[1],
+        object_data[2],
+        object_data[3],
+        object_data[4],
+        object_data[5],
+        object_data[6],
+        object_data[7],
+        object_data[8],
+        object_data[9],
+        object_data[10],
+        object_data[11],
+    ];
+    warn!(
+        logger,
+        "Parsing compiled object for {} (magic {:x?})", name, magic
+    );
+
+    let in_object = object::File::parse(object_data).unwrap();
 
     let mut out_object = write::Object::new(in_object.format(), in_object.architecture());
     out_object.mangling = write::Mangling::None;
