@@ -6,20 +6,5 @@ jobs:
 
 - template: azure-pipelines-template.yml
   parameters:
-    name: macOS1014
-    vmImage: macOS-10.14
-
-- template: azure-pipelines-template.yml
-  parameters:
     name: Windows2012
     vmImage: vs2015-win2012r2
-
-- template: azure-pipelines-template.yml
-  parameters:
-    name: Windows2016
-    vmImage: vs2017-win2016
-
-- template: azure-pipelines-template.yml
-  parameters:
-    name: Windows2019
-    vmImage: windows-2019
