@@ -37,12 +37,22 @@ pub fn rename_init(
     let in_object = match object::File::parse(object_data) {
         Ok(object) => object,
         Err(err) => {
-            warn!(logger, "Failed to parse compiled object for {}: {}", name, err);
+            let magic = [
+                object_data[0],
+                object_data[1],
+                object_data[2],
+                object_data[3],
+            ];
+            warn!(
+                logger,
+                "Failed to parse compiled object for {} (magic {:x?}): {}", name, magic, err
+            );
             return Err(NoRewriteError);
         }
     };
 
     let mut out_object = write::Object::new(in_object.format(), in_object.architecture());
+    out_object.mangling = write::Mangling::None;
 
     let mut out_sections = HashMap::new();
     for in_section in in_object.sections() {
@@ -77,10 +87,9 @@ pub fn rename_init(
         };
         let in_sym_name = in_symbol.name().unwrap_or("");
         let sym_name = if in_sym_name.contains("PyInit_") && !in_sym_name.contains(name_prefix) {
-            match out_object.mangling.global_prefix() {
-                Some(prefix) => format!("{}PyInit_{}", prefix as char, name.replace(".", "_")),
-                None => format!("PyInit_{}", name.replace(".", "_"))
-            }
+            let pyinit_start = in_sym_name.find("PyInit_").unwrap();
+
+            (in_sym_name[0..(pyinit_start + 7)].to_string() + &name.replace(".", "_"))
         } else {
             String::from(in_sym_name)
         };
