@@ -90,7 +90,7 @@ pub fn rename_init(
             None => (None, in_symbol.address()),
         };
         let in_sym_name = in_symbol.name().unwrap_or("");
-        let sym_name = if in_sym_name.contains("PyInit_") && !in_sym_name.contains(name_prefix) {
+        let sym_name = if !in_sym_name.starts_with("$") && in_sym_name.contains("PyInit_") && !in_sym_name.contains(name_prefix) {
             let pyinit_start = in_sym_name.find("PyInit_").unwrap();
 
             (in_sym_name[0..(pyinit_start + 7)].to_string() + &name.replace(".", "_"))
