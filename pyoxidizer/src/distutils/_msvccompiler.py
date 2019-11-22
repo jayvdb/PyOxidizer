@@ -352,7 +352,7 @@ class MSVCCompiler(CCompiler) :
 
         compile_opts = extra_preargs or []
         compile_opts.append('/c')
-        if debug:
+        if True:
             compile_opts.extend(self.compile_options_debug)
         else:
             compile_opts.extend(self.compile_options)

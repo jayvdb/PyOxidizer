@@ -40,8 +40,8 @@ jobs:
     - script: |
         set RUST_BACKTRACE=1
         set PIP_VERBOSE=1
-        set DISTUTILS_USE_SDK=1
-        echo %PATH%
+        echo PATH=%PATH%
+        echo VS80COMNTOOLS=%VS80COMNTOOLS%
         cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --python-code 'print("hello, world")' %HOME%/pyapp
         cargo run --bin pyoxidizer -- run %HOME%/pyapp
       displayName: Build Oxidized Application (Windows)
