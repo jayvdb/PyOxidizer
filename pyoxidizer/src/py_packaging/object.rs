@@ -128,10 +128,9 @@ pub fn rename_init(
         if in_section.kind() == SectionKind::Metadata {
             continue;
         }
-        if in_section.kind() == SectionKind::SectionIndex {
+        /*if in_section.kind() == SectionKind::SectionIndex {
             continue;
-        }
-
+        }*/
         let out_section = *out_sections.get(&in_section.index()).unwrap();
         for (offset, in_relocation) in in_section.relocations() {
             let symbol = match in_relocation.target() {
