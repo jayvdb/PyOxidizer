@@ -89,9 +89,7 @@ pub fn rename_init(
             && in_sym_name.contains("PyInit_")
             && !in_sym_name.contains(name_prefix)
         {
-            let pyinit_start = in_sym_name.find("PyInit_").unwrap();
-
-            (in_sym_name[0..(pyinit_start + 7)].to_string() + &name.replace(".", "_"))
+            "PyInit_".to_string() + &name.replace(".", "_")
         } else {
             String::from(in_sym_name)
         };
