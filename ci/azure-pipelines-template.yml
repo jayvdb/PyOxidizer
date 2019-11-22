@@ -49,12 +49,12 @@ jobs:
 
   - ${{ if ne(parameters.name, 'Windows') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson ~/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --pip-install gevent ~/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
 
   - ${{ if eq(parameters.name, 'Windows') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson %HOME%/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --pip-install gevent %HOME%/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run %HOME%/pyapp
       displayName: Build Oxidized Application (Windows)
