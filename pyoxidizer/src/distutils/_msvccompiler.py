@@ -590,15 +590,21 @@ class MSVCCompiler(CCompiler) :
             with open(o, 'rb') as f:
                 data = f.read()
             magic = data[0:8]
-            print('{} len %d, magic {!r}'.format(o, len(data), magic), file=sys.stderr)
-            print("link /dump:", file=sys.stderr)
-            print(subprocess.run("link /dump {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
-            print("bindump:", file=sys.stderr)
-            print(subprocess.run("bindump {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
-            print("objdump:", file=sys.stderr)
-            print(subprocess.run("objdump -syms {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
-            print("nm:", file=sys.stderr)
-            print(subprocess.run("nm {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
+            print('{} len {}, magic {!r}'.format(o, len(data), magic), file=sys.stderr)
+            print("link /PDB:", file=sys.stderr)
+            print(subprocess.run("link /PDB:foo.pdb {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
+            #print("bindump:", file=sys.stderr)
+            #print(subprocess.run("bindump {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
+            try:
+                print("objdump:", file=sys.stderr)
+                print(subprocess.run("objdump -syms {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
+            except Exception:
+                pass
+            try:
+                print("nm:", file=sys.stderr)
+                print(subprocess.run("nm {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
+            except Exception:
+                pass
             p = os.path.join(dest_path, '%s.%d.o' % (name, i))
             shutil.copyfile(o, p)
             object_paths.append(p)
