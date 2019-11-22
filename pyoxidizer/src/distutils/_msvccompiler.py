@@ -591,18 +591,21 @@ class MSVCCompiler(CCompiler) :
                 data = f.read()
             magic = data[0:8]
             print('{} len {}, magic {!r}'.format(o, len(data), magic), file=sys.stderr)
-            print("link /PDB:", file=sys.stderr)
-            print(subprocess.run("link /PDB:foo.pdb {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
+            try:
+                print("link /PDB:", file=sys.stderr)
+                print(subprocess.run("link /PDB:foo.pdb {}".format(o), stdout=subprocess.PIPE), file=sys.stderr)
+            except Exception:
+                pass
             #print("bindump:", file=sys.stderr)
             #print(subprocess.run("bindump {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
             try:
                 print("objdump:", file=sys.stderr)
-                print(subprocess.run("objdump -syms {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
+                print(subprocess.run("objdump --syms {}".format(o), stdout=subprocess.PIPE), file=sys.stderr)
             except Exception:
                 pass
             try:
                 print("nm:", file=sys.stderr)
-                print(subprocess.run("nm {}".format(o), stdout=subprocess.PIPE).stdout, file=sys.stderr)
+                print(subprocess.run("nm {}".format(o), stdout=subprocess.PIPE), file=sys.stderr)
             except Exception:
                 pass
             p = os.path.join(dest_path, '%s.%d.o' % (name, i))
