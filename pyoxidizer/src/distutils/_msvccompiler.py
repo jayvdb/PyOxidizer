@@ -590,7 +590,11 @@ class MSVCCompiler(CCompiler) :
             with open(o, 'rb') as f:
                 data = f.read()
             magic = data[0:8]
-            print('{} len %d, magic {!r}'.format(o, len(data), magic))
+            print('{} len %d, magic {!r}'.format(o, len(data), magic), file=sys.stderr)
+            print("link /dump:", file=sys.stderr)
+            print(subprocess.check_output("link /dump /all {}".format(o)), file=sys.stderr)
+            print("bindump:", file=sys.stderr)
+            print(subprocess.check_output("bindump {}".format(o)), file=sys.stderr)
             p = os.path.join(dest_path, '%s.%d.o' % (name, i))
             shutil.copyfile(o, p)
             object_paths.append(p)
