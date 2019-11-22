@@ -55,6 +55,7 @@ jobs:
 
   - ${{ if eq(parameters.name, 'Windows') }}:
     - script: |
+        set PIP_VERBOSE=1
         cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --pip-install gevent %HOME%/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run %HOME%/pyapp
       displayName: Build Oxidized Application (Windows)
