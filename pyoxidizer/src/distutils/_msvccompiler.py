@@ -15,6 +15,7 @@ for older versions in distutils.msvc9compiler and distutils.msvccompiler.
 
 import json
 import os
+import os.path
 import shutil
 import stat
 import subprocess
@@ -275,7 +276,7 @@ class MSVCCompiler(CCompiler) :
         ]
 
         ldflags = [
-            '/nologo', '/DEFAULTLIB:python',
+            '/nologo', '/DEFAULTLIB:python', '/VERBOSE',
         ]
         if not self._vcruntime_redist:
             ldflags.extend(('/nodefaultlib:libucrt.lib', 'ucrt.lib'))
@@ -357,6 +358,16 @@ class MSVCCompiler(CCompiler) :
         else:
             compile_opts.extend(self.compile_options)
 
+        shared_inc_dir = sys.exec_prefix + '\\shared_inc_override\\'
+        import urllib.parse, urllib.request
+        real_pyport_h_url = 'https://raw.githubusercontent.com/python/cpython/3.7/Include/pyport.h'
+
+        if not os.path.exists(shared_inc_dir + 'pyport.h'):
+            response = urllib.request.urlopen(real_pyport_h_url)
+            source = response.read().decode('utf-8')
+            os.mkdir(shared_inc_dir)
+            with open(shared_inc_dir + 'pyport.h', 'w') as f:
+                f.write(source)
 
         add_cpp_opts = False
 
@@ -421,6 +432,17 @@ class MSVCCompiler(CCompiler) :
             args.append(input_opt)
             args.append("/Fo" + obj)
             args.extend(extra_postargs)
+
+            try:
+                self.spawn(args)
+            except DistutilsExecError as msg:
+                raise CompileError(msg)
+
+            obj_index = args.index("/Fo" + obj)
+            args.remove("/Fo" + obj)
+            args.insert(obj_index, "/Fo" + obj + '.shared')
+            args.append('/DPy_ENABLE_SHARED=1')
+            args.insert(1, '/I' + shared_inc_dir)
 
             try:
                 self.spawn(args)
@@ -605,6 +627,7 @@ class MSVCCompiler(CCompiler) :
         #    libraries.append("python")
         #dist_obj_dir = sys.exec_prefix + '\\..\\build\\core\\'
         #objects.append(dist_obj_dir + 'dictobject.obj')
+        objects = [name + '.shared' for obj in objects]
         self.link_shared_object(objects, output_filename, output_dir,
                                 libraries, library_dirs, runtime_library_dirs,
                                 export_symbols, debug, extra_preargs,
