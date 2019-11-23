@@ -18,6 +18,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 import winreg
 
 from distutils.errors import DistutilsExecError, DistutilsPlatformError, \
