@@ -603,7 +603,7 @@ class MSVCCompiler(CCompiler) :
             libraries = ['python']
         else:
             libraries.append("python")
-        dist_obj_dir = sys.exec_prefix + '\\build\\core\\'
+        dist_obj_dir = sys.exec_prefix + '\\..\\build\\core\\'
         objects.append(dist_obj_dir + 'dictobject.obj')
         self.link_shared_object(objects, output_filename, output_dir,
                                 libraries, library_dirs, runtime_library_dirs,
