@@ -275,7 +275,7 @@ class MSVCCompiler(CCompiler) :
         ]
 
         ldflags = [
-            '/nologo', '/INCREMENTAL:NO', '/LTCG'
+            '/nologo', '/DEFAULTLIB:python',
         ]
         if not self._vcruntime_redist:
             ldflags.extend(('/nodefaultlib:libucrt.lib', 'ucrt.lib'))
@@ -599,12 +599,12 @@ class MSVCCompiler(CCompiler) :
         # However, the built shared library may be needed as a build
         # dependency for installing other packages in the packaging rules,
         # (e.g. _cffi_backend) and often only need the core CPython symbols.
-        if libraries is None:
-            libraries = ['python']
-        else:
-            libraries.append("python")
-        dist_obj_dir = sys.exec_prefix + '\\..\\build\\core\\'
-        objects.append(dist_obj_dir + 'dictobject.obj')
+        #if libraries is None:
+        #    libraries = ['python']
+        #else:
+        #    libraries.append("python")
+        #dist_obj_dir = sys.exec_prefix + '\\..\\build\\core\\'
+        #objects.append(dist_obj_dir + 'dictobject.obj')
         self.link_shared_object(objects, output_filename, output_dir,
                                 libraries, library_dirs, runtime_library_dirs,
                                 export_symbols, debug, extra_preargs,
