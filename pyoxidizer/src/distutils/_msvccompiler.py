@@ -571,6 +571,10 @@ class MSVCCompiler(CCompiler) :
         # which they won't be for a shared library. PyOxidizer doesn't use the
         # library anyway (at least not yet), so don't even bother with any
         # linking.
+        if libraries is None:
+            libraries = ['python']
+        else:
+            libraries.append("python")
         self.link(CCompiler.SHARED_OBJECT, objects,
                   output_filename, output_dir,
                   libraries, library_dirs, runtime_library_dirs,
