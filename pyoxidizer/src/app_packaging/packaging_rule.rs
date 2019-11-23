@@ -512,6 +512,35 @@ fn resolve_pip_install_simple(
     let target_dir_s = target_dir_path.display().to_string();
     warn!(logger, "pip installing to {}", target_dir_s);
 
+    // Install cffi from binary wheel
+    let mut pip_install_cffi: Vec<String> = vec![
+        "-m".to_string(),
+        "pip".to_string(),
+        "--disable-pip-version-check".to_string(),
+        "install".to_string(),
+        "cffi".to_string(),
+    ];
+
+    let mut cmd = std::process::Command::new(&dist.python_exe)
+        .args(&pip_install_cffi)
+        .envs(&extra_envs)
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("error running pip");
+    {
+        let stdout = cmd.stdout.as_mut().unwrap();
+        let reader = BufReader::new(stdout);
+
+        for line in reader.lines() {
+            warn!(logger, "{}", line.unwrap());
+        }
+    }
+
+    let status = cmd.wait().unwrap();
+    if !status.success() {
+        panic!("error running pip");
+    }
+
     let mut pip_args: Vec<String> = vec![
         "-m".to_string(),
         "pip".to_string(),
