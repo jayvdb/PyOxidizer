@@ -565,22 +565,6 @@ class MSVCCompiler(CCompiler) :
         if 'PYOXIDIZER_DISTUTILS_STATE_DIR' not in os.environ:
             raise Exception('PYOXIDIZER_DISTUTILS_STATE_DIR not defined')
 
-        # The extension is compiled as a built-in, so linking a shared library
-        # won't work due to symbol visibility/export issues. The extension is
-        # expecting all CPython symbols to be available in the current binary,
-        # which they won't be for a shared library. PyOxidizer doesn't use the
-        # library anyway (at least not yet), so don't even bother with any
-        # linking.
-        if libraries is None:
-            libraries = ['python']
-        else:
-            libraries.append("python")
-        self.link(CCompiler.SHARED_OBJECT, objects,
-                  output_filename, output_dir,
-                  libraries, library_dirs, runtime_library_dirs,
-                  export_symbols, debug,
-                  extra_preargs, extra_postargs, build_temp, target_lang)
-
         # In addition to performing the requested link, we also write out
         # files that PyOxidizer can use to embed the extension in a larger
         # binary.
@@ -608,6 +592,22 @@ class MSVCCompiler(CCompiler) :
             }
             json.dump(data, fh, indent=4, sort_keys=True)
 
+        # The extension is compiled as a built-in, so linking a shared library
+        # may not work due to symbol visibility/export issues, as not all
+        # CPython symbols are be available in the standalone binary.
+        # However, the built shared library may be needed as a build
+        # dependency for installing other packages in the packaging rules,
+        # (e.g. _cffi_backend) and often only need the core CPython symbols.
+        if libraries is None:
+            libraries = ['python']
+        else:
+            libraries.append("python")
+        dist_obj_dir = sys.exec_prefix + '\\build\\core\\'
+        objects.append(dist_obj_dir + 'dictobject.obj')
+        self.link_shared_object(objects, output_filename, output_dir,
+                                libraries, library_dirs, runtime_library_dirs,
+                                export_symbols, debug, extra_preargs,
+                                extra_postargs, build_temp, target_lang)
 
     # -- Miscellaneous methods -----------------------------------------
     # These are all used by the 'gen_lib_options() function, in
