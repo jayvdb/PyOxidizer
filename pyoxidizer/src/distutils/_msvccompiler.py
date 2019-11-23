@@ -627,7 +627,9 @@ class MSVCCompiler(CCompiler) :
         #    libraries.append("python")
         #dist_obj_dir = sys.exec_prefix + '\\..\\build\\core\\'
         #objects.append(dist_obj_dir + 'dictobject.obj')
-        objects = [name + '.obj.shared' for obj in objects]
+        print(objects, file=sys.stderr)
+        objects = [name.replace('.', '/') + '.obj.shared' for obj in objects]
+        print(objects, file=sys.stderr)
         self.link_shared_object(objects, output_filename, output_dir,
                                 libraries, library_dirs, runtime_library_dirs,
                                 export_symbols, debug, extra_preargs,
