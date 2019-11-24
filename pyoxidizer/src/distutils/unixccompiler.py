@@ -227,9 +227,15 @@ class UnixCCompiler(CCompiler):
         if 'PYOXIDIZER_DISTUTILS_STATE_DIR' not in os.environ:
             raise Exception('PYOXIDIZER_DISTUTILS_STATE_DIR not defined')
 
+        libs=libraries.copy()
+        if 'crypto' in libs:
+            libs.remove('crypto')
+        if 'ssl' in libs:
+            libs.remove('ssl')
+
         self.link(CCompiler.SHARED_OBJECT, objects,
                   output_filename, output_dir,
-                  libraries, library_dirs, runtime_library_dirs,
+                  libs, library_dirs, runtime_library_dirs,
                   export_symbols, debug,
                   extra_preargs, extra_postargs, build_temp, target_lang)
 
