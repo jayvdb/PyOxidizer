@@ -558,7 +558,7 @@ impl ParsedPythonDistribution {
 
         prepare_hacked_distutils(logger, &python_paths);
 
-        for (_, path) in self.libraries.iter() {
+        /*for (_, path) in self.libraries.iter() {
             let target = python_paths.dll_dir.join(path.file_name().unwrap());
             if !target.exists() {
                 symlink_file(&path, &target).unwrap();
@@ -569,7 +569,7 @@ impl ParsedPythonDistribution {
                     warn!(logger, "added {}", target.display().to_string());
                 }
             }
-	    }
+	    }*/
 
         python_paths
     }
@@ -590,7 +590,7 @@ impl ParsedPythonDistribution {
 
         let python_paths = resolve_python_paths(&path, &self.version);
 
-        for (_, path) in self.libraries.iter() {
+        /*for (_, path) in self.libraries.iter() {
             let target = python_paths.dll_dir.join(path.file_name().unwrap());
             if !target.exists() {
                 symlink_file(&path, &target).unwrap();
@@ -601,7 +601,7 @@ impl ParsedPythonDistribution {
                     warn!(logger, "added {}", target.display().to_string());
                 }
             }
-	    }
+	    }*/
 
         python_paths
     }
