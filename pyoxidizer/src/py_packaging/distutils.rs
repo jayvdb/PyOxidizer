@@ -58,6 +58,11 @@ pub fn prepare_hacked_distutils(logger: &slog::Logger, target: &PythonPaths) {
     for (path, data) in MODIFIED_DISTUTILS_FILES.iter() {
         let dest_path = dest_distutils_path.join(path);
 
+        if !dest_path.exists() {
+            warn!(logger, "not updating missing distutils/{}", path);
+            continue;
+        }
+
         warn!(logger, "modifying distutils/{} for oxidation", path);
         std::fs::write(dest_path, data).unwrap();
     }
