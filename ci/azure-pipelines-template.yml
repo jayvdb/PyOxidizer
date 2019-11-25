@@ -50,8 +50,8 @@ jobs:
     - script: |
         export CPPFLAGS="-I$(brew --prefix openssl@1.1)/include"
         export LDFLAGS="-L$(brew --prefix openssl@1.1)/lib"
-        cargo run --bin pyoxidizer -- init --pip-install cryptography --python-code 'import cryptography; print("hello, world")' ~/pyapp
-        cat ci/pyapp.py | cargo run --bin pyoxidizer -- --verbose run %HOME%/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install cryptography ~/pyapp
+        cat ci/pyapp.py | cargo run --bin pyoxidizer -- --verbose run ~/pyapp
       displayName: Build Oxidized Application
 
   - ${{ if eq(parameters.name, 'Windows') }}:
