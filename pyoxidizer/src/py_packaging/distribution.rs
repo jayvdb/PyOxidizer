@@ -36,12 +36,6 @@ const PIP_EXE_BASENAME: &str = "pip3.exe";
 #[cfg(unix)]
 const PIP_EXE_BASENAME: &str = "pip3";
 
-#[cfg(windows)]
-const VENV_MODULE: &str = "virtualenv";
-
-#[cfg(unix)]
-const VENV_MODULE: &str = "venv";
-
 const STDLIB_TEST_PACKAGES: &[&str] = &[
     "bsddb.test",
     "ctypes.test",
@@ -542,10 +536,6 @@ impl ParsedPythonDistribution {
 
         invoke_python(&python_paths, &logger, &["-m", "ensurepip"]);
 
-        if VENV_MODULE == "virtualenv" {
-            invoke_python(&python_paths, &logger, &["-m", "pip", "install", "virtualenv"]);
-        }
-
         prepare_hacked_distutils(logger, &python_paths);
 
         python_paths
@@ -559,10 +549,10 @@ impl ParsedPythonDistribution {
         let python_paths = self.create_hacked_base(&logger);
 
         if path.exists() {
-            warn!(logger, "re-using {} {}", VENV_MODULE, venv_dir_s);
+            warn!(logger, "re-using {} {}", "venv", venv_dir_s);
         } else {
-            warn!(logger, "creating {} {}", VENV_MODULE, venv_dir_s);
-            invoke_python(&python_paths, &logger, &["-m", VENV_MODULE, venv_dir_s.as_str()]);
+            warn!(logger, "creating {} {}", "venv", venv_dir_s);
+            invoke_python(&python_paths, &logger, &["-m", "venv", venv_dir_s.as_str()]);
         }
 
         resolve_python_paths(&path, &self.version)
