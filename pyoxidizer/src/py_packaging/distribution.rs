@@ -504,21 +504,6 @@ impl ParsedPythonDistribution {
                     logger,
                     "copied {} to create hacked base {}", external_dist_prefix_s, venv_dir_s
                 );
-
-                let dist_prefix = self.base_dir.join("python").join("install");
-
-                let static_base = self.base_dir.parent().unwrap().join("static_base");
-
-                copy_dir(&dist_prefix, &static_base).unwrap();
-
-                let dist_prefix_s = dist_prefix.display().to_string();
-                warn!(
-                    logger,
-                    "copied {} to create static base {}", dist_prefix_s, static_base.display().to_string()
-                );
-
-                let python_paths = resolve_python_paths(&static_base, &self.version);
-                prepare_hacked_distutils(logger, &python_paths);
             } else {
                 let dist_prefix = self.base_dir.join("python").join("install");
 
