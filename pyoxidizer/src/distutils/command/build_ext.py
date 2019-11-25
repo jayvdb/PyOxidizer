@@ -554,23 +554,6 @@ class build_ext(Command):
             fn = self.compiler.link_shared_object
             extra_kwargs = {}
 
-        if self.plat_name == 'win32':
-            try:
-                base = pathlib.Path(sys.real_prefix)
-            except AttributeError:
-                base = pathlib.Path(sys.prefix)
-            if self.plat_name == 'win32':
-                pyox_libs = str(base)
-            else:
-                pyox_libs = str(base / 'lib')
-            if os.path.exists(pyox_libs):
-                if not ext.library_dirs:
-                    ext.library_dirs = []
-                if pyox_libs not in ext.library_dirs:
-                    ext.library_dirs.append(pyox_libs)
-
-            print("lib_dirs", ext.library_dirs, file=sys.stderr)
-
         fn(
             objects, ext_path,
             libraries=self.get_libraries(ext),
