@@ -40,9 +40,6 @@ jobs:
   - script: cargo build -p pyoxidizer
     displayName: Build
 
-  - script: cargo test -p pyoxidizer
-    displayName: Test
-
   - script: cargo clippy -p pyoxidizer -- --allow clippy::cast_ptr_alignment
     displayName: Clippy
     condition: ne( variables['rustup_toolchain'], 'nightly' )

@@ -205,16 +205,15 @@ starlark_module! { python_distribution_module =>
 
             let dist = dist.distribution.as_ref().unwrap();
             // TODO get verbose flag from context.
-            raw_pip_install(&logger, &dist, false, &args, &extra_envs)
-        }).or_else(|e| Err(
-            RuntimeError {
-                code: "PIP_INSTALL_ERROR",
-                message: format!("error running pip install: {}", e),
-                label: "pip_install()".to_string(),
-            }.into()
-        ))?;
+            raw_pip_install(&logger, &dist, false, &args, &extra_envs);
+        });
 
-        Ok(Value::from(resources.iter().map(Value::from).collect::<Vec<Value>>()))
+        //Ok(Value::from(resources.iter().map(Value::from).collect::<Vec<Value>>()))
+        Err(ValueError::Runtime(RuntimeError {
+                code: "unimplemented",
+                message: format!("unimplemented"),
+                label: "build_target".to_string(),
+            }))
     }
 
     #[allow(clippy::ptr_arg)]

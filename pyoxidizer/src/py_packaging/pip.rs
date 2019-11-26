@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
-use super::distribution::ParsedPythonDistribution;
+use super::distribution::{ParsedPythonDistribution, PythonPaths};
 use super::distutils::{prepare_hacked_distutils, read_built_extensions};
 use super::fsscan::{find_python_resources, PythonFileResource};
 use super::resource::PythonResource;
@@ -20,13 +20,13 @@ pub fn pip_install(
     verbose: bool,
     install_args: &[String],
     extra_envs: &HashMap<String, String>,
-) -> Result<Vec<PythonResource>, String> {
+)  { //-> Result<Vec<PythonResource>, String>
     let temp_dir = tempdir::TempDir::new("pyoxidizer-pip-install")
-        .or_else(|_| Err("could not create temp directory".to_string()))?;
+        .or_else(|_| Err("could not create temp directory".to_string())).unwrap();
 
-    dist.ensure_pip();
+    dist.ensure_pip(&logger);
 
-    let mut env = prepare_hacked_distutils(logger, dist, temp_dir.path(), &[])?;
+    let mut env = HashMap::new();
 
     for (key, value) in extra_envs.iter() {
         env.insert(key.clone(), value.clone());
@@ -60,25 +60,25 @@ pub fn pip_install(
         .envs(&env)
         .stdout(std::process::Stdio::piped())
         .spawn()
-        .or(Err("error running pip".to_string()))?;
+        .unwrap();
     {
         let stdout = cmd
             .stdout
             .as_mut()
-            .ok_or("could not open stdout from pip".to_string())?;
+            .unwrap();
         let reader = BufReader::new(stdout);
 
         for line in reader.lines() {
             warn!(
                 logger,
                 "{}",
-                line.or(Err("could not read line".to_string()))?
+                line.or(Err("could not read line".to_string())).unwrap()
             );
         }
     }
 
     let status = cmd.wait().unwrap();
-    if !status.success() {
+/*    if !status.success() {
         return Err("error running pip".to_string());
     }
 
@@ -103,5 +103,5 @@ pub fn pip_install(
         res.push(PythonResource::BuiltExtensionModule(ext));
     }
 
-    Ok(res)
+    Ok(res)*/
 }
