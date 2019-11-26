@@ -46,13 +46,13 @@ jobs:
 
   - ${{ if ne(parameters.name, 'Windows') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --pip-install poetry ~/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install tomlkit ~/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
 
   - ${{ if eq(parameters.name, 'Windows') }}:
     - script: |
         set RUST_BACKTRACE=full
-        cargo run --bin pyoxidizer -- init --pip-install poetry %USERPROFILE%/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install tomlkit %USERPROFILE%/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- --verbose run %USERPROFILE%/pyapp
       displayName: Build Oxidized Application (Windows)
