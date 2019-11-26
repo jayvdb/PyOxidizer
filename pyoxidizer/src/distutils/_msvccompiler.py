@@ -593,7 +593,11 @@ class MSVCCompiler(CCompiler) :
                 # https://github.com/indygreg/python-build-standalone/issues/23
                 # Library 'ffi' should be added here
                 continue
-            o = o + '.static'
+            # If there are pre-compiled .obj files provided
+            # they will not have a .static version, and the
+            # original should be used.  greenlet does this.
+            if os.path.exists(o + '.static'):
+                o = o + '.static'
             p = os.path.join(dest_path, '%s.%d.o' % (name, i))
             shutil.copyfile(o, p)
             object_paths.append(p)
