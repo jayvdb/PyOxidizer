@@ -511,8 +511,8 @@ fn resolve_pip_install_simple(
     verbose: bool,
 ) -> Vec<PythonResourceAction> {
     let mut install_args = vec![
-        "--no-binary".to_string(),
-        ":all:".to_string(),
+        //"--no-binary".to_string(),
+        //":all:".to_string(),
         rule.package.clone(),
     ];
 

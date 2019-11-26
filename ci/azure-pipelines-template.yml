@@ -40,21 +40,19 @@ jobs:
   - script: cargo build -p pyoxidizer
     displayName: Build
 
-  - script: cargo test -p pyoxidizer
-    displayName: Test
-
   - script: cargo clippy -p pyoxidizer -- --allow clippy::cast_ptr_alignment
     displayName: Clippy
     condition: ne( variables['rustup_toolchain'], 'nightly' )
 
   - ${{ if ne(parameters.name, 'Windows') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --python-code 'print("hello, world")' ~/pyapp
-        cargo run --bin pyoxidizer -- run ~/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install poetry ~/pyapp
+        cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
 
   - ${{ if eq(parameters.name, 'Windows') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --python-code 'print("hello, world")' %HOME%/pyapp
-        cargo run --bin pyoxidizer -- run %HOME%/pyapp
+        set RUST_BACKTRACE=full
+        cargo run --bin pyoxidizer -- init --pip-install poetry %USERPROFILE%/pyapp
+        cat ci/pyapp.py | cargo run --bin pyoxidizer -- --verbose run %USERPROFILE%/pyapp
       displayName: Build Oxidized Application (Windows)
