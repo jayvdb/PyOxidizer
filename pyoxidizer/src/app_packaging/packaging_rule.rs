@@ -498,8 +498,8 @@ fn resolve_pip_install_simple(
 
     pip_args.extend(vec![
         "install".to_string(),
-        "--no-binary".to_string(),
-        ":all:".to_string(),
+        //"--no-binary".to_string(),
+        //":all:".to_string(),
         rule.package.clone(),
     ]);
 
