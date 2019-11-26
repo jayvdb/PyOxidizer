@@ -377,7 +377,8 @@ pub fn resolve_python_paths(base: &Path, python_version: &str) -> PythonPaths {
         p.join(PYTHON_EXE_BASENAME)
     };
 
-    let pyoxidizer_state_dir = p.join(PathBuf::from(PYOXIDIZER_STATE_DIR));
+    let mut pyoxidizer_state_dir = p.clone();
+    pyoxidizer_state_dir.extend(PYOXIDIZER_STATE_DIR.split('/'));
 
     let unix_lib_dir = p.join("lib").join(format!("python{}", &python_version[0..3]));
 
