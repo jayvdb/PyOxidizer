@@ -561,8 +561,8 @@ fn resolve_pip_requirements_file(
 
     pip_args.extend(vec![
         "install".to_string(),
-        "--no-binary".to_string(),
-        ":all:".to_string(),
+        //"--no-binary".to_string(),
+        //":all:".to_string(),
         "--requirement".to_string(),
         rule.requirements_path.to_string(),
     ]);
