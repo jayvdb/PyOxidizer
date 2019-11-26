@@ -13,3 +13,7 @@ s += 'token:\n' + str(t) + '\n\n'
 s += 'decoded message:\n' + str(d)
 print(s)
 assert d == m
+
+import markupsafe, simplejson
+
+print("hello, world")
