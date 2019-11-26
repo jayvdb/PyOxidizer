@@ -325,7 +325,7 @@ pub fn link_libpython(
         );
         for path in &em.object_paths {
             let mut out_path = path.clone();
-            if path.ends_with("_queuemodule.o")
+            if (path.ends_with("_queuemodule.o") || path.ends_with("_queuemodule.obj"))
                 && built_extension_modules.contains_key("gevent._queue")
             {
                 out_path = temp_dir_path.join(format!("{}_stdlib_prefixed.o", path.display()));
