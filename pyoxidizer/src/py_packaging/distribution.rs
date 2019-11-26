@@ -605,6 +605,10 @@ impl ParsedPythonDistribution {
 
         extra_envs.insert("PYOXIDIZER".to_string(), "1".to_string());
 
+        let state_dir_s = python_paths.pyoxidizer_state_dir.display().to_string();
+        warn!(logger, "creating {}", state_dir_s);
+
+
         fs::create_dir_all(&python_paths.pyoxidizer_state_dir).unwrap();
 
         (python_paths, extra_envs)
