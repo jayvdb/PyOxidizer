@@ -56,6 +56,7 @@ jobs:
     - script: |
         set INCLUDE=%ProgramFiles%\OpenSSL-Win64\include;%INCLUDE%
         set LIB=%ProgramFiles%\OpenSSL-Win64\lib\;%LIB%
+        set RUST_BACKTRACE=full
         cargo run --bin pyoxidizer -- init --pip-install cryptography %HOME%/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- --verbose run %HOME%/pyapp
       displayName: Build Oxidized Application (Windows)
