@@ -355,34 +355,32 @@ pub struct PythonPaths {
 }
 
 /// Resolve the location of Python modules given a base install path.
-pub fn resolve_python_paths(base: &Path, python_version: &str) -> PythonPaths {
-    let prefix = base.to_path_buf().canonicalize().unwrap();
+pub fn resolve_python_paths(base: &Path, python_version: &str, is_windows: bool) -> PythonPaths {
+	let prefix = base.to_path_buf();
 
-    let p = prefix.clone();
-
-    let bin_dir = if p.join("Scripts").exists() {
+    let mut p = prefix.clone();
+    let bin_dir = if is_windows {
         p.join("Scripts")
     } else {
         p.join("bin")
     };
 
-    let python_exe = if bin_dir.join(PYTHON_EXE_BASENAME).exists() {
-        bin_dir.join(PYTHON_EXE_BASENAME)
-    } else {
+    let python_exe = if is_windows {
         p.join(PYTHON_EXE_BASENAME)
-    };
-
-    let pyoxidizer_state_dir = p.join("state").join("pyoxidizer");
-
-    let unix_lib_dir = p.join("lib").join(format!("python{}", &python_version[0..3]));
-
-    let stdlib = if unix_lib_dir.exists() {
-        unix_lib_dir.clone()
     } else {
-        p.join("Lib")
-    }.canonicalize().unwrap();
+         bin_dir.join(PYTHON_EXE_BASENAME)
+    };
+    let pyoxidizer_state_dir = p.join("state/pyoxidizer");
 
-    let site_packages = stdlib.join("site-packages");
+    if is_windows {
+        p.push("Lib");
+    } else {
+        p.push("lib");
+        p.push(format!("python{}", &python_version[0..3]));
+    }
+
+    let stdlib = p.clone();
+    let site_packages = p.join("site-packages");
 
     PythonPaths {
         prefix,
@@ -471,7 +469,7 @@ impl ParsedPythonDistribution {
     /// Ensure pip is available to run in the distribution.
     pub fn ensure_pip(&self, logger: &slog::Logger) -> PathBuf {
         let dist_prefix = self.base_dir.join("python").join("install");
-        let python_paths = resolve_python_paths(&dist_prefix, &self.version);
+        let python_paths = resolve_python_paths(&dist_prefix, &self.version, self.os == "windows");
 
         let pip_path = python_paths.bin_dir.join(PIP_EXE_BASENAME);
 
@@ -517,7 +515,7 @@ impl ParsedPythonDistribution {
             };
         }
 
-        let python_paths = resolve_python_paths(&venv_base, &self.version);
+        let python_paths = resolve_python_paths(&venv_base, &self.version, self.os == "windows");
 
         invoke_python(&python_paths, &logger, &["-m", "ensurepip"]);
 
@@ -540,7 +538,7 @@ impl ParsedPythonDistribution {
             invoke_python(&python_paths, &logger, &["-m", "venv", venv_dir_s.as_str()]);
         }
 
-        resolve_python_paths(&path, &self.version)
+        resolve_python_paths(&path, &self.version, self.os == "windows")
     }
 
     /// Create or re-use an existing venv

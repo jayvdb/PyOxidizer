@@ -431,7 +431,7 @@ fn resolve_virtualenv(
     let location = ResourceLocation::new(&rule.install_location);
 
     let python_paths =
-        resolve_python_paths(&Path::new(&rule.path), &dist.version);
+        resolve_python_paths(&Path::new(&rule.path), &dist.version, dist.os == "windows");
 
     process_resources(
         &logger,
