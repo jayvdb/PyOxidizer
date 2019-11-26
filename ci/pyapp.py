@@ -17,3 +17,14 @@ assert d == m
 import markupsafe, simplejson
 
 print("hello, world")
+
+# This only confirms the built objects are loadable.
+import gevent
+import gevent._queue
+assert 'gevent' in dir(gevent._queue)
+
+import gevent._event
+import gevent._greenlet
+import gevent._local
+import gevent.resolver.cares
+import gevent.libev.corecext
