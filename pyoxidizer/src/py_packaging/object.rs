@@ -96,7 +96,7 @@ pub fn rename_init(
         if sym_name != in_sym_name {
             warn!(
                 logger,
-                "rewrote object symbol name {} to {}", in_sym_name, sym_name,
+                "renaming object symbol name {} to {}", in_sym_name, sym_name,
             );
 
             rewritten = true;
@@ -113,6 +113,10 @@ pub fn rename_init(
         };
         let symbol_id = out_object.add_symbol(out_symbol);
         out_symbols.insert(symbol_index, symbol_id);
+        info!(
+            logger,
+            "added object symbol name {}", sym_name,
+        );
     }
 
     if !rewritten {
@@ -145,6 +149,8 @@ pub fn rename_init(
                 .unwrap();
         }
     }
+
+    info!(logger, "serialising object for {} ..", name);
 
     Ok(out_object.write().unwrap())
 }
