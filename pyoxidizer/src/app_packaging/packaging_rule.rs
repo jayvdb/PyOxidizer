@@ -571,6 +571,10 @@ fn resolve_pip_requirements_file(
         pip_args.extend(args.clone());
     }
 
+    for (key, value) in rule.extra_env.iter() {
+        extra_envs.insert(key.clone(), value.clone());
+    }
+
     warn!(
         logger,
         "Running {} {}",
