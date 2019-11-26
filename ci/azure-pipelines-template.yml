@@ -49,7 +49,7 @@ jobs:
 
   - ${{ if eq(parameters.name, 'Linux') }}:
     - script: |
-        cargo run --bin pyoxidizer -- init --pip-install cryptography ~/pyapp
+        cargo run --bin pyoxidizer -- init --pip-install cryptography --pip-install simplejson --pip-install cryptography ~/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
 
