@@ -112,18 +112,29 @@ pub fn rename_init(
             rewritten = true;
         }
 
-        let mut out_symbol = write::Symbol {
-            name: sym_name.as_bytes().to_vec(),
-            value,
-            size: in_symbol.size(),
-            kind: in_symbol.kind(),
-            scope: in_symbol.scope(),
-            weak: in_symbol.is_weak(),
-            section,
-        };
-        if name.contains("__real@3ff0000000000000") {
-            out_symbol.weak = true;
+        let out_symbol = if in_sym_name.contains("__real@3ff0000000000000") {
+			write::Symbol {
+                name: sym_name.as_bytes().to_vec(),
+                value,
+                size: in_symbol.size(),
+                kind: in_symbol.kind(),
+                scope: in_symbol.scope(),
+                weak: true,
+                section,
+            }
         }
+        else {
+			write::Symbol {
+                name: sym_name.as_bytes().to_vec(),
+                value,
+                size: in_symbol.size(),
+                kind: in_symbol.kind(),
+                scope: in_symbol.scope(),
+                weak: in_symbol.is_weak(),
+                section,
+            }
+        };
+
         let symbol_id = out_object.add_symbol(out_symbol);
         out_symbols.insert(symbol_index, symbol_id);
         info!(
