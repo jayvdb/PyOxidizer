@@ -111,16 +111,18 @@ class UnixCCompiler(CCompiler):
 
     def _compile(self, obj, src, ext, cc_args, extra_postargs, pp_opts):
         compiler_so = self.compiler_so
+        print('sys.platform', sys.platform, cc_args, extra_postargs)
         if sys.platform == 'darwin':
-            if '-O3' in cc_args:
-                cc_args.remove('-O3')
-                cc_args.append('-O0')
-
-            if '-O3' in extra_postargs:
-                extra_postargs.remove('-O3')
-                extra_postargs.append('-O0')
             compiler_so = _osx_support.compiler_fixup(compiler_so,
                                                     cc_args + extra_postargs)
+        if '-O3' in cc_args:
+            cc_args.remove('-O3')
+            cc_args.append('-O0')
+
+        if '-O3' in extra_postargs:
+            extra_postargs.remove('-O3')
+            extra_postargs.append('-O0')
+
         try:
             self.spawn(compiler_so + cc_args + [src, '-o', obj] +
                        extra_postargs)
