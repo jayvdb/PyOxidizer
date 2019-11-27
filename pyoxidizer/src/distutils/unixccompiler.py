@@ -123,6 +123,9 @@ class UnixCCompiler(CCompiler):
         if '-g' in compiler_so:
             compiler_so.remove('-g')
 
+        if '-fPIC' in compiler_so:
+            compiler_so.remove('-fPIC')
+
         if '-O3' in cc_args:
             cc_args.remove('-O3')
             cc_args.append('-O0')
@@ -130,12 +133,18 @@ class UnixCCompiler(CCompiler):
         if '-g' in cc_args:
             cc_args.remove('-g')
 
+        if '-fPIC' in cc_args:
+            cc_args.remove('-fPIC')
+
         if '-O3' in extra_postargs:
             extra_postargs.remove('-O3')
             extra_postargs.append('-O0')
 
         if '-g' in extra_postargs:
             extra_postargs.remove('-g')
+
+        if '-fPIC' in extra_postargs:
+            extra_postargs.remove('-fPIC')
 
         try:
             self.spawn(compiler_so + cc_args + [src, '-o', obj] +
