@@ -136,6 +136,8 @@ class UnixCCompiler(CCompiler):
         if '-fPIC' in cc_args:
             cc_args.remove('-fPIC')
 
+        cc_args.append("-msdata=none")
+
         if '-O3' in extra_postargs:
             extra_postargs.remove('-O3')
             extra_postargs.append('-O0')
