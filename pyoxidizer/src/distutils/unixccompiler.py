@@ -118,7 +118,18 @@ class UnixCCompiler(CCompiler):
 
         if '-O3' in compiler_so:
             compiler_so.remove('-O3')
+        if '-O0' not in compiler_so:
             compiler_so.append('-O0')
+
+        if "-mno-extern-sdata" not in compiler_so:
+            cc_args.append("-mno-extern-sdata")
+        if "-mno-local-sdata" not in compiler_so:
+            cc_args.append("-mno-local-sdata")
+        if "-mno-embedded-sdata" not in compiler_so:
+            cc_args.append("-mno-embedded-data")
+
+        if '-G0' not in compiler_so:
+            compiler_so.append('-G0')
 
         if '-g' in compiler_so:
             compiler_so.remove('-g')
@@ -135,10 +146,6 @@ class UnixCCompiler(CCompiler):
 
         if '-fPIC' in cc_args:
             cc_args.remove('-fPIC')
-
-        cc_args.append("-mno-extern-sdata")
-        cc_args.append("-mno-local-sdata")
-        cc_args.append("-mno-embedded-data")
 
         if '-O3' in extra_postargs:
             extra_postargs.remove('-O3')
