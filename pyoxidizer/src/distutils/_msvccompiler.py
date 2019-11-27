@@ -272,7 +272,7 @@ class MSVCCompiler(CCompiler) :
         self.compile_options.append('/MD' if self._vcruntime_redist else '/MT')
 
         self.compile_options_debug = [
-            '/nologo', '/Od', '/MDd', '/Zi', '/W3', '/D_DEBUG'
+            '/nologo', '/Od', '/MDd', '/Zi', '/W3',
         ]
 
         ldflags = [
