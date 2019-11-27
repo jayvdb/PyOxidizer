@@ -112,7 +112,7 @@ pub fn rename_init(
             rewritten = true;
         }
 
-        let out_symbol = write::Symbol {
+        let mut out_symbol = write::Symbol {
             name: sym_name.as_bytes().to_vec(),
             value,
             size: in_symbol.size(),
@@ -121,6 +121,9 @@ pub fn rename_init(
             weak: in_symbol.is_weak(),
             section,
         };
+        if name.contains("__real@3ff0000000000000") {
+            out_symbol.weak = true;
+        }
         let symbol_id = out_object.add_symbol(out_symbol);
         out_symbols.insert(symbol_index, symbol_id);
         info!(
