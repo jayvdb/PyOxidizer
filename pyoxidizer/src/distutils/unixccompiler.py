@@ -136,7 +136,9 @@ class UnixCCompiler(CCompiler):
         if '-fPIC' in cc_args:
             cc_args.remove('-fPIC')
 
-        cc_args.append("-msdata=none")
+        cc_args.append("-mno-extern-sdata")
+        cc_args.append("-mno-local-sdata")
+        cc_args.append("-mno-embedded-data")
 
         if '-O3' in extra_postargs:
             extra_postargs.remove('-O3')

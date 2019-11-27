@@ -60,8 +60,6 @@ jobs:
 
   - ${{ if eq(parameters.name, 'macOS') }}:
     - script: |
-        export CC=gcc
-        export CXX=g++
         export CPPFLAGS="-I$(brew --prefix openssl@1.1)/include"
         export LDFLAGS="-L$(brew --prefix openssl@1.1)/lib"
         export RUST_BACKTRACE=1
