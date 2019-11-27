@@ -75,7 +75,18 @@ pub fn rename_init(
     let mut out_symbols = HashMap::new();
     for (symbol_index, in_symbol) in in_object.symbols() {
         if in_symbol.kind() == SymbolKind::Null {
+            warn!(
+                logger,
+                "object symbol name kind 'null' discarded",
+            );
             continue;
+        }
+        let in_sym_name = in_symbol.name().unwrap_or("");
+        if in_symbol.kind() == SymbolKind::Unknown {
+            warn!(
+                logger,
+                "object symbol name {} kind 'unknown' encountered", in_sym_name,
+            );
         }
         let (section, value) = match in_symbol.section_index() {
             Some(index) => (
@@ -84,7 +95,6 @@ pub fn rename_init(
             ),
             None => (None, in_symbol.address()),
         };
-        let in_sym_name = in_symbol.name().unwrap_or("");
         let sym_name = if !in_sym_name.starts_with("$")
             && in_sym_name.contains("PyInit_")
             && !in_sym_name.contains(name_prefix)
@@ -115,7 +125,7 @@ pub fn rename_init(
         out_symbols.insert(symbol_index, symbol_id);
         info!(
             logger,
-            "added object symbol name {}", sym_name,
+            "added object symbol name {} kind {:?}", sym_name, in_symbol,
         );
     }
 

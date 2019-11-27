@@ -90,7 +90,7 @@ pub fn derive_importlib(dist: &ParsedPythonDistribution) -> ImportlibData {
 pub fn make_config_c(
     extension_modules: &BTreeMap<String, ExtensionModule>,
     built_extension_modules: &BTreeMap<String, BuiltExtensionModule>,
-    is_windows: bool,
+    is_linux: bool,
 ) -> String {
     // It is easier to construct the file from scratch than parse the template
     // and insert things in the right places.
@@ -105,7 +105,7 @@ pub fn make_config_c(
                 continue;
             }
 
-            if !is_windows && init_fn == "PyInit__queue" && built_extension_modules.contains_key("gevent._queue") {
+            if is_linux && init_fn == "PyInit__queue" && built_extension_modules.contains_key("gevent._queue") {
                 lines.push("extern PyObject* PyInit_stdlib_queue(void);".to_string());
             } else {
                 lines.push(format!("extern PyObject* {}(void);", init_fn));
@@ -136,7 +136,7 @@ pub fn make_config_c(
                 continue;
             }
 
-            if !is_windows && init_fn == "PyInit__queue" && built_extension_modules.contains_key("gevent._queue") {
+            if is_linux && init_fn == "PyInit__queue" && built_extension_modules.contains_key("gevent._queue") {
                 lines.push("{\"_queue\", PyInit_stdlib_queue},".to_string());
             } else {
                 lines.push(format!("{{\"{}\", {}}},", em.module, init_fn));
@@ -206,7 +206,7 @@ pub fn link_libpython(
         "deriving custom config.c from {} extension modules",
         extension_modules.len() + built_extension_modules.len()
     );
-    let config_c_source = make_config_c(&extension_modules, &built_extension_modules, dist.os == "windows");
+    let config_c_source = make_config_c(&extension_modules, &built_extension_modules, dist.os == "linux");
     let config_c_path = out_dir.join("config.c");
     let config_c_temp_path = temp_dir_path.join("config.c");
 
@@ -306,7 +306,7 @@ pub fn link_libpython(
     );
     for (name, em) in extension_modules {
         if let Some(init_fn) = &em.init_fn {
-            if dist.os != "windows" && init_fn == "PyInit__queue" && built_extension_modules.contains_key("gevent._queue") {
+            if dist.os == "linux" && init_fn == "PyInit__queue" && built_extension_modules.contains_key("gevent._queue") {
                 ambiguous_init_fns.push("PyInit_stdlib_queue".to_string());
             } else if init_fn != "NULL" {
                 ambiguous_init_fns.push(init_fn.to_string());
@@ -326,7 +326,7 @@ pub fn link_libpython(
         );
         for path in &em.object_paths {
             let mut out_path = path.clone();
-            if path.ends_with("_queuemodule.o") // || path.ends_with("_queuemodule.obj"))
+            if path.ends_with("_queuemodule.o") && dist.os == "linux" // || path.ends_with("_queuemodule.obj"))
                 && built_extension_modules.contains_key("gevent._queue")
             {
                 out_path = temp_dir_path.join(format!("{}_stdlib_prefixed.o", path.display()));
