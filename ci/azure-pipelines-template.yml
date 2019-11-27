@@ -49,6 +49,7 @@ jobs:
 
   - ${{ if eq(parameters.name, 'Linux') }}:
     - script: |
+        export RUST_BACKTRACE=1
         cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --pip-install cryptography --pip-install gevent ~/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
@@ -61,6 +62,7 @@ jobs:
     - script: |
         export CPPFLAGS="-I$(brew --prefix openssl@1.1)/include"
         export LDFLAGS="-L$(brew --prefix openssl@1.1)/lib"
+        export RUST_BACKTRACE=1
         cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --pip-install cryptography --pip-install gevent ~/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
