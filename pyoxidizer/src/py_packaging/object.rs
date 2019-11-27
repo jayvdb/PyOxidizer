@@ -113,6 +113,10 @@ pub fn rename_init(
         }
 
         let out_symbol = if in_sym_name.contains("__real@3ff0000000000000") {
+            warn!(
+                logger,
+                "fiddling with __real {}", in_sym_name,
+            );
 			write::Symbol {
                 name: sym_name.as_bytes().to_vec(),
                 value,
@@ -139,7 +143,7 @@ pub fn rename_init(
         out_symbols.insert(symbol_index, symbol_id);
         info!(
             logger,
-            "added object symbol name {} kind {:?}", sym_name, out_symbol,
+            "added object symbol name {} kind {:?}", sym_name, in_symbol,
         );
     }
 
