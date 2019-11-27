@@ -139,7 +139,7 @@ pub fn rename_init(
         out_symbols.insert(symbol_index, symbol_id);
         info!(
             logger,
-            "added object symbol name {} kind {:?}", sym_name, in_symbol,
+            "added object symbol name {} kind {:?}", sym_name, out_symbol,
         );
     }
 
