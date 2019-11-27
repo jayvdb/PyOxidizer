@@ -152,6 +152,8 @@ class UnixCCompiler(CCompiler):
         except DistutilsExecError as msg:
             raise CompileError(msg)
 
+        os.system("nm {}".format(obj))
+
     def create_static_lib(self, objects, output_libname,
                           output_dir=None, debug=0, target_lang=None):
         objects, output_dir = self._fix_object_args(objects, output_dir)

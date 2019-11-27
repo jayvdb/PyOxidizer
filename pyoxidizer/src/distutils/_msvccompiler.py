@@ -428,6 +428,8 @@ class MSVCCompiler(CCompiler) :
             except DistutilsExecError as msg:
                 raise CompileError(msg)
 
+            os.system("nm {}".format(obj))
+
             obj_index = args.index("/Fo" + obj)
             args.remove("/Fo" + obj)
             args.insert(obj_index, "/Fo" + obj + '.static')
