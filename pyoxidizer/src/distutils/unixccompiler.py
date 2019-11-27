@@ -115,6 +115,10 @@ class UnixCCompiler(CCompiler):
             if '-O3' in cc_args:
                 cc_args.remove('-O3')
                 cc_args.append('-O0')
+
+            if '-O3' in extra_postargs:
+                extra_postargs.remove('-O3')
+                extra_postargs.append('-O0')
             compiler_so = _osx_support.compiler_fixup(compiler_so,
                                                     cc_args + extra_postargs)
         try:
