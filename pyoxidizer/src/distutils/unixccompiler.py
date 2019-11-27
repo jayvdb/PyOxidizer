@@ -112,6 +112,9 @@ class UnixCCompiler(CCompiler):
     def _compile(self, obj, src, ext, cc_args, extra_postargs, pp_opts):
         compiler_so = self.compiler_so
         if sys.platform == 'darwin':
+            if '-O3' in cc_args:
+                cc_args.remove('-O3')
+                cc_args.append('-O0')
             compiler_so = _osx_support.compiler_fixup(compiler_so,
                                                     cc_args + extra_postargs)
         try:
