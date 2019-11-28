@@ -8,3 +8,8 @@ jobs:
   parameters:
     name: Windows
     vmImage: vs2017-win2016
+
+- template: azure-pipelines-template.yml
+  parameters:
+    name: Linux
+    vmImage: ubuntu-16.04
