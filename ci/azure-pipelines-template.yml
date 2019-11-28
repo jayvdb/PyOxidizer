@@ -69,6 +69,8 @@ jobs:
         export LDFLAGS="-L$(brew --prefix openssl@1.1)/lib"
         export RUST_BACKTRACE=1
         export PIP_VERBOSE=1
+        brew install binutils
+        gobjcopy --help
         cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --pip-install cryptography --pip-install gevent ~/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application

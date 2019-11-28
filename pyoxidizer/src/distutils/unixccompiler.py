@@ -129,7 +129,7 @@ class UnixCCompiler(CCompiler):
         os.system("objdump --section-headers {}".format(obj))
         os.system("objdump -t {}".format(obj))
         # os.system("objdump -s {}".format(obj))
-        # os.system("objcopy --redefine-sym PyInit__queue=PyInit_gevent__queue {}".format(obj))
+        os.system("gobjcopy --redefine-sym PyInit__queue=PyInit_gevent__queue {}".format(obj))
         # os.system("objdump --syms {}".format(obj))
 
     def create_static_lib(self, objects, output_libname,
