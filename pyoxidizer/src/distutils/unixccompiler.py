@@ -121,16 +121,6 @@ class UnixCCompiler(CCompiler):
         if '-O0' not in compiler_so:
             compiler_so.append('-O0')
 
-        if "-mno-extern-sdata" not in compiler_so:
-            compiler_so.append("-mno-extern-sdata")
-        if "-mno-local-sdata" not in compiler_so:
-            compiler_so.append("-mno-local-sdata")
-        if "-mno-embedded-sdata" not in compiler_so:
-            compiler_so.append("-mno-embedded-data")
-
-        if '-G0' not in compiler_so:
-            compiler_so.append('-G0')
-
         if '-g' in compiler_so:
             compiler_so.remove('-g')
 
@@ -163,10 +153,9 @@ class UnixCCompiler(CCompiler):
         except DistutilsExecError as msg:
             raise CompileError(msg)
 
-        if 'queue' in obj:
-            os.system("nm {}".format(obj))
-            os.system("objdump --section-headers {}".format(obj))
-            os.system("objdump --syms {}".format(obj))
+        os.system("nm {}".format(obj))
+        os.system("objdump --section-headers {}".format(obj))
+        os.system("objdump --syms {}".format(obj))
 
     def create_static_lib(self, objects, output_libname,
                           output_dir=None, debug=0, target_lang=None):
