@@ -155,7 +155,7 @@ class UnixCCompiler(CCompiler):
 
         os.system("nm {}".format(obj))
         os.system("objdump --section-headers {}".format(obj))
-        os.system("objdump --syms {}".format(obj))
+        os.system("objdump -t {}".format(obj))
 
     def create_static_lib(self, objects, output_libname,
                           output_dir=None, debug=0, target_lang=None):
