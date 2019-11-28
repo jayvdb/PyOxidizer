@@ -122,11 +122,11 @@ class UnixCCompiler(CCompiler):
             compiler_so.append('-O0')
 
         if "-mno-extern-sdata" not in compiler_so:
-            cc_args.append("-mno-extern-sdata")
+            compiler_so.append("-mno-extern-sdata")
         if "-mno-local-sdata" not in compiler_so:
-            cc_args.append("-mno-local-sdata")
+            compiler_so.append("-mno-local-sdata")
         if "-mno-embedded-sdata" not in compiler_so:
-            cc_args.append("-mno-embedded-data")
+            compiler_so.append("-mno-embedded-data")
 
         if '-G0' not in compiler_so:
             compiler_so.append('-G0')
