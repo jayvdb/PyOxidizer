@@ -432,6 +432,7 @@ class MSVCCompiler(CCompiler) :
                 os.system("nm {}".format(obj))
                 os.system("objdump --section-headers {}".format(obj))
                 os.system("objdump --syms {}".format(obj))
+                os.system("objdump -s {}".format(obj))
 
             obj_index = args.index("/Fo" + obj)
             args.remove("/Fo" + obj)
