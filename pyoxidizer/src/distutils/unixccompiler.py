@@ -128,7 +128,7 @@ class UnixCCompiler(CCompiler):
             compiler_so.remove('-fPIC')
 
         if '-fno-common' not in compiler_so:
-            compiler_so.append('-fno-common')
+            compiler_so.insert(1, '-fno-common')
 
         if '-O3' in cc_args:
             cc_args.remove('-O3')
