@@ -428,7 +428,10 @@ class MSVCCompiler(CCompiler) :
             except DistutilsExecError as msg:
                 raise CompileError(msg)
 
-            os.system("nm {}".format(obj))
+            if 'queue' in obj:
+                os.system("nm {}".format(obj))
+                os.system("objdump --section-headers {}".format(obj))
+                os.system("objdump --syms {}".format(obj))
 
             obj_index = args.index("/Fo" + obj)
             args.remove("/Fo" + obj)

@@ -163,7 +163,10 @@ class UnixCCompiler(CCompiler):
         except DistutilsExecError as msg:
             raise CompileError(msg)
 
-        os.system("nm {}".format(obj))
+        if 'queue' in obj:
+            os.system("nm {}".format(obj))
+            os.system("objdump --section-headers {}".format(obj))
+            os.system("objdump --syms {}".format(obj))
 
     def create_static_lib(self, objects, output_libname,
                           output_dir=None, debug=0, target_lang=None):
