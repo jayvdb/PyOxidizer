@@ -428,14 +428,6 @@ class MSVCCompiler(CCompiler) :
             except DistutilsExecError as msg:
                 raise CompileError(msg)
 
-            if 'queue' in obj:
-                os.system("nm {}".format(obj))
-                os.system("objdump --section-headers {}".format(obj))
-                os.system("objdump --syms {}".format(obj))
-                #os.system("objdump -s {}".format(obj))
-                os.system("objcopy --redefine-sym PyInit__queue=PyInit_gevent__queue {}".format(obj))
-                os.system("objdump --syms {}".format(obj))
-
             obj_index = args.index("/Fo" + obj)
             args.remove("/Fo" + obj)
             args.insert(obj_index, "/Fo" + obj + '.static')
@@ -447,6 +439,16 @@ class MSVCCompiler(CCompiler) :
                 self.spawn(args)
             except DistutilsExecError as msg:
                 raise CompileError(msg)
+
+            obj = obj + '.static'
+            if 'queue' in obj:
+                os.system("nm {}".format(obj))
+                os.system("objdump --section-headers {}".format(obj))
+                os.system("objdump --syms {}".format(obj))
+                #os.system("objdump -s {}".format(obj))
+                os.system("objcopy --redefine-sym PyInit__queue=PyInit_gevent__queue {}".format(obj))
+                os.system("objdump --syms {}".format(obj))
+
 
         return objects
 
