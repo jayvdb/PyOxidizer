@@ -8,4 +8,8 @@ try:
 except AttributeError:
     pass
 
+import simplejson._speedups
+
+import simplejson
+
 print("hello, world")
