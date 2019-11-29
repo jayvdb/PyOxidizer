@@ -20,6 +20,12 @@ path = "src/lib.rs"
 [build-dependencies]
 vergen = "3"
 
+# Contains fixes needed for Linux and macOS
+[dependencies.object]
+git = "https://github.com/philipc/object.git"
+branch = "common"
+features = ["read", "std", "write"]
+
 [dependencies]
 byteorder = "1.2"
 cargo_toml = "0.6"
@@ -38,7 +44,6 @@ hex = "0.3"
 itertools = "0.8"
 lazy_static = "1.3"
 libc = "0.2"
-object = { version = "0.16.0", features = ["read", "std", "write"] }
 regex = "1"
 reqwest = "0.9"
 rustc_version = "0.2"
