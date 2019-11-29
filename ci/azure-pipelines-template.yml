@@ -70,6 +70,10 @@ jobs:
         export RUST_BACKTRACE=1
         export PIP_VERBOSE=1
         brew install binutils
+        # binutils doesnt automatically install into /usr/local/bin
+        # and we only want gobjcopy
+        ln -s /usr/local/opt/binutils/bin/gobjcopy /usr/local/bin
+        ln -s /usr/local/opt/binutils/bin/objcopy /usr/local/bin/gobjcopy
         gobjcopy --help
         cargo run --bin pyoxidizer -- init --pip-install markupsafe --pip-install simplejson --pip-install cryptography --pip-install gevent ~/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
