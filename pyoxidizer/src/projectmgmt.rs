@@ -479,7 +479,6 @@ pub fn build_project(logger: &slog::Logger, context: &mut BuildContext) -> Resul
         args.push("jemalloc");
     }
 
-    // Allow multiple definitions on Windows when using link.exe
     /*if context.target_triple.contains("msvc") {
         args.push("-C");
         args.push("link-args=/FORCE:MULTIPLE");
@@ -504,7 +503,10 @@ pub fn build_project(logger: &slog::Logger, context: &mut BuildContext) -> Resul
     // https://github.com/rust-lang/rust/issues/37403 is resolved.
     if cfg!(windows) {
         envs.push(("RUSTC_BOOTSTRAP", "1".to_string()));
-        envs.push(("RUSTFLAGS", "-C link-args=/FORCE:MULTIPLE".to_string()));
+        // Allow multiple definitions when using link.exe
+        if context.target_triple.contains("msvc") {
+            envs.push(("RUSTFLAGS", "-C link-args=/FORCE:MULTIPLE".to_string()));
+        }
     }
 
     match process::Command::new("cargo")
