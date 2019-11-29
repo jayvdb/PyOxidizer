@@ -1154,8 +1154,6 @@ pub fn process_config(
         cargo_metadata.push(format!("cargo:rerun-if-changed={}", local_path));
     }
 
-    cargo_metadata.push("cargo:rustflags=['-C', 'link-args=/FORCE:MULTIPLE']".to_string());
-
     // Obtain the configured Python distribution and parse it to a data structure.
     warn!(logger, "resolving Python distribution...");
     let python_distribution_path =
