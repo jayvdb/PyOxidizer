@@ -443,11 +443,11 @@ class MSVCCompiler(CCompiler) :
             obj = obj + '.static'
             if 'queue' in obj:
                 os.system("nm {}".format(obj))
-                os.system("objdump --section-headers {}".format(obj))
-                os.system("objdump --syms {}".format(obj))
+                #os.system("objdump --section-headers {}".format(obj))
+                #os.system("objdump --syms {}".format(obj))
                 #os.system("objdump -s {}".format(obj))
-                os.system("objcopy --redefine-sym PyInit__queue=PyInit_gevent__queue {}".format(obj))
-                os.system("objdump --syms {}".format(obj))
+                #os.system("objcopy --redefine-sym PyInit__queue=PyInit_gevent__queue {}".format(obj))
+                #os.system("objdump --syms {}".format(obj))
 
 
         return objects
