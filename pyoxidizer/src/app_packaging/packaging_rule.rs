@@ -512,6 +512,13 @@ fn resolve_pip_install_simple(
         extra_envs.insert(key.clone(), value.clone());
     }
 
+    warn!(
+        logger,
+        "Running {} {}",
+        python_paths.python_exe.display(),
+        pip_args.join(" ")
+    );
+
     // TODO send stderr to stdout.
     let mut cmd = std::process::Command::new(&python_paths.python_exe)
         .args(&pip_args)
