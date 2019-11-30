@@ -568,7 +568,7 @@ impl ParsedPythonDistribution {
 
         let mut extra_envs = HashMap::new();
 
-        let prefix_s = python_paths
+        let mut prefix_s = python_paths
             .prefix
             .canonicalize()
             .unwrap()
@@ -597,6 +597,12 @@ impl ParsedPythonDistribution {
             .unwrap()
             .display()
             .to_string();
+
+        // Windows canonicalise adds prefix \\?\, which may confuse Python
+        if prefix_s.starts_with("\\\\?\\") {
+            prefix_s = prefix_s[4..].to_string();
+        }
+
         if site_packages_s.starts_with("\\\\?\\") {
             site_packages_s = site_packages_s[4..].to_string();
         }
