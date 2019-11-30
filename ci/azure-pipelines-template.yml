@@ -11,6 +11,7 @@ jobs:
   - ${{ if eq(parameters.name, 'Windows') }}:
     - powershell: |
         Install-Module -Name InstallModuleFromGitHub -Force
+        Install-ModuleFromGitHub -GitHubRepo dfinke/InstallModuleFromGitHub
         Install-ModuleFromGitHub -GitHubRepo Badgerati/Fudge
         fudge install -adhoc openssl
       env:
