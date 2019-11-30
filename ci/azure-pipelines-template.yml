@@ -12,7 +12,7 @@ jobs:
     - powershell: |
         Install-Module PSDepend -Force
         Get-Dependency -InputObject @{ 'Badgerati/Fudge' = @{ Version = 'develop'; Parameters = @{ ExtractPath = 'src/*' } } } | Install-Dependency
-        & "$env:PSModulePath\Fudge\Fudge.ps1" install -adhoc openssl
+        Fudge install -adhoc openssl
       env:
         CHOCOLATEY_CACHE: $(LocalAppData)\chocolatey\Cache
       displayName: 'Install OpenSSL'
