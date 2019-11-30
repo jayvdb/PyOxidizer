@@ -13,10 +13,12 @@ jobs:
         Install-Module PSDepend -Force
         Get-Dependency -InputObject @{ 'Badgerati/Fudge' = 'master' } | Install-Dependency
         dir "C:\Program Files\WindowsPowerShell\Modules\Fudge"
-        C:\Program Files\WindowsPowerShell\Modules\Fudge\fudge.ps1 install -adhoc openssl
+        dir "C:\Program Files\WindowsPowerShell\Modules\Fudge\Fudge"
       env:
         CHOCOLATEY_CACHE: $(LocalAppData)\chocolatey\Cache
       displayName: 'Install OpenSSL'
+
+  # $env:ProgramFiles + "\WindowsPowerShell\Modules\Fudge\Fudge\fudge.ps1" install -adhoc openssl
 
   - ${{ if ne(parameters.name, 'Windows') }}:
     - script: |
