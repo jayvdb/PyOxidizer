@@ -10,8 +10,8 @@ jobs:
   steps:
   - ${{ if eq(parameters.name, 'Windows') }}:
     - powershell: |
-        Install-Module -Name Install-GitHubRepository -Force
-        Install-GitHubRepository -Owner Badgerati -Repository Fudge
+        iex ('$module="Fudge";$user="Badgerati";$repo="Fudge"'+(new-object net.webclient).DownloadString('https://raw.githubusercontent.com/PsModuleInstall/InstallFromGithub/master/install.ps1'))
+        ImportModule Fudge
         fudge install -adhoc openssl
       env:
         CHOCOLATEY_CACHE: $(LocalAppData)\chocolatey\Cache
