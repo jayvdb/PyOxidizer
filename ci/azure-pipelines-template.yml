@@ -12,8 +12,8 @@ jobs:
     - script: |
         set CHOCOLATEY_CACHE=%LocalAppData%\chocolatey\Cache
         choco config set cacheLocation %CHOCOLATEY_CACHE%
-        powershell -c "Install-Package fudge -Version 1.3.0"
-        dotnet add package --no-restore fudge --version 1.3.0
+        powershell -c "Install-Package fudge"
+        dotnet add foo package --no-restore fudge --version 1.3.0
         dir %userprofile%\.nuget\packages
         dir %userprofile%\.nuget\packages\fudge-1.3.0
         fudge install -adhoc openssl
