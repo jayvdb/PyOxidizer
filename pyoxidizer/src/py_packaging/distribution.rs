@@ -615,6 +615,10 @@ impl ParsedPythonDistribution {
 
         fs::create_dir_all(&python_paths.pyoxidizer_state_dir).unwrap();
 
+        //warn!(logger, "using python paths {:?}", python_paths); `PythonPaths` doesn't implement `std::fmt::Debug`
+
+        warn!(logger, "setting envvars {:?}", extra_envs);
+
         (python_paths, extra_envs)
     }
 
