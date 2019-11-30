@@ -10,9 +10,8 @@ jobs:
   steps:
   - ${{ if eq(parameters.name, 'Windows') }}:
     - powershell: |
-        Install-Module -Name InstallModuleFromGitHub -Force
-        Install-ModuleFromGitHub -GitHubRepo dfinke/InstallModuleFromGitHub
-        Install-ModuleFromGitHub -GitHubRepo Badgerati/Fudge
+        Install-Module -Name Install-GitHubRepository -Force
+        Install-GitHubRepository -Owner Badgerati -Repository Fudge
         fudge install -adhoc openssl
       env:
         CHOCOLATEY_CACHE: $(LocalAppData)\chocolatey\Cache
