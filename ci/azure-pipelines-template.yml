@@ -11,9 +11,7 @@ jobs:
   - ${{ if eq(parameters.name, 'Windows') }}:
     - powershell: |
         Install-Module PSDepend -Force
-        Invoke-PSDepend -InputObject @{
-            "Badgerati/Fudge" = 'master'
-        }
+        Get-Dependency -InputObject @{ 'Badgerati/Fudge' = 'master' } | Install-Dependency
         Import-Module Fudge
         fudge install -adhoc openssl
       env:
