@@ -12,7 +12,6 @@ jobs:
     - powershell: |
         Install-Module PSDepend -Force
         Get-Dependency -InputObject @{ 'Badgerati/Fudge' = 'master' } | Install-Dependency
-        Import-Module Fudge
         fudge install -adhoc openssl
       env:
         CHOCOLATEY_CACHE: $(LocalAppData)\chocolatey\Cache
