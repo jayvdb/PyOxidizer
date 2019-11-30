@@ -10,8 +10,8 @@ jobs:
   steps:
   - ${{ if eq(parameters.name, 'Windows') }}:
     - powershell: |
-        (new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/psget/psget/master/GetPsGet.ps1") | iex
-        Install-Module -ModuleUrl https://github.com/Badgerati/Fudge/zipball/master
+        Install-Module -Name InstallModuleFromGitHub
+        Install-ModuleFromGitHub -GitHubRepo Badgerati/Fudge
         fudge install -adhoc openssl
       env:
         CHOCOLATEY_CACHE: $(LocalAppData)\chocolatey\Cache
