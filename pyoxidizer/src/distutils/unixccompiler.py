@@ -225,15 +225,16 @@ class UnixCCompiler(CCompiler):
                            package=None,
                            ):
 
-        libs=libraries.copy()
-        if 'crypto' in libs:
-            libs.remove('crypto')
-        if 'ssl' in libs:
-            libs.remove('ssl')
+        non_static_libs = libraries.copy()
+        #static_libs = sysconfig.get_config_vars('LIBS')[0].replace('-l','').split()
+        if 'crypto' in non_static_libs:
+            non_static_libs.remove('crypto')
+        if 'ssl' in non_static_libs:
+            non_static_libs.remove('ssl')
 
         self.link(CCompiler.SHARED_OBJECT, objects,
                   output_filename, output_dir,
-                  libs, library_dirs, runtime_library_dirs,
+                  non_static_libs, library_dirs, runtime_library_dirs,
                   export_symbols, debug,
                   extra_preargs, extra_postargs, build_temp, target_lang)
 
