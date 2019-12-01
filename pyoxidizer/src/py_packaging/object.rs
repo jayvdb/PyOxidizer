@@ -2,7 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use object::{write, Object, ObjectSection, RelocationTarget, SectionKind, SymbolKind};
+use object::{
+    write, Object, ObjectSection, RelocationTarget, SectionKind, SymbolKind, SymbolSection,
+};
 use slog::{info, warn};
 use std::collections::HashMap;
 use std::error::Error;
@@ -76,10 +78,7 @@ pub fn rename_init(
     for (symbol_index, in_symbol) in in_object.symbols() {
         if in_symbol.kind() == SymbolKind::Null {
             // This is normal in ELF
-            info!(
-                logger,
-                "object symbol name kind 'null' discarded",
-            );
+            info!(logger, "object symbol name kind 'null' discarded",);
             continue;
         }
         let in_sym_name = in_symbol.name().unwrap_or("");
@@ -89,12 +88,15 @@ pub fn rename_init(
                 "object symbol name {} kind 'unknown' encountered", in_sym_name,
             );
         }
-        let (section, value) = match in_symbol.section_index() {
-            Some(index) => (
-                Some(*out_sections.get(&index).unwrap()),
+        let (section, value) = match in_symbol.section() {
+            SymbolSection::Unknown => panic!("unknown symbol section for {:?}", in_symbol),
+            SymbolSection::Undefined => (write::SymbolSection::Undefined, in_symbol.address()),
+            SymbolSection::Absolute => (write::SymbolSection::Absolute, in_symbol.address()),
+            SymbolSection::Common => (write::SymbolSection::Common, in_symbol.address()),
+            SymbolSection::Section(index) => (
+                write::SymbolSection::Section(*out_sections.get(&index).unwrap()),
                 in_symbol.address() - in_object.section_by_index(index).unwrap().address(),
             ),
-            None => (None, in_symbol.address()),
         };
         let sym_name = if !in_sym_name.starts_with("$")
             && in_sym_name.contains("PyInit_")
