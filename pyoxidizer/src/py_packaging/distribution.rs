@@ -607,7 +607,7 @@ impl ParsedPythonDistribution {
             site_packages_s = site_packages_s[4..].to_string();
         }
 
-        extra_envs.insert("VIRTUAL_ENV".to_string(), prefix_s.clone());
+        //extra_envs.insert("VIRTUAL_ENV".to_string(), prefix_s.clone());
         //extra_envs.insert("PYTHONHOME".to_string(), prefix_s);
         //extra_envs.insert("PYTHONPATH".to_string(), site_packages_s);
 
