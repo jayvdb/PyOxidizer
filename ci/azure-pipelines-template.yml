@@ -59,10 +59,11 @@ jobs:
 
   - ${{ if eq(parameters.name, 'macOS') }}:
     - script: |
+        export PIP_VERBOSE=1
         export CPPFLAGS="-I$(brew --prefix openssl@1.1)/include"
         export LDFLAGS="-L$(brew --prefix openssl@1.1)/lib"
         cargo run --bin pyoxidizer -- init --pip-install appdirs==1.4.3 --pip-install cryptography==2.8 ~/pyapp
-        cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
+        cat ci/pyapp.py | cargo --verbose run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
 
   - ${{ if eq(parameters.name, 'Windows') }}:

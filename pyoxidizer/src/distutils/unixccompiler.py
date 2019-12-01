@@ -226,6 +226,8 @@ class UnixCCompiler(CCompiler):
                            ):
 
         non_static_libs = libraries.copy()
+        from pprint import pprint
+        pprint(sysconfig.get_config_vars())
         #static_libs = sysconfig.get_config_vars('LIBS')[0].replace('-l','').split()
         if 'crypto' in non_static_libs:
             non_static_libs.remove('crypto')
