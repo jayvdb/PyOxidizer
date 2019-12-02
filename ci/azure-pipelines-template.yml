@@ -58,3 +58,11 @@ jobs:
         cargo run --bin pyoxidizer -- init --pip-install appdirs==1.4.3 --pip-install zero-buffer==0.5.1 --pip-install markupsafe==1.1.1 --pip-install simplejson==3.17.0 %USERPROFILE%/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run %USERPROFILE%/pyapp
       displayName: Build Oxidized Application (Windows)
+
+  - ${{ if ne(parameters.name, 'Windows') }}:
+    - script: |
+        cargo run --bin pyoxidizer -- init ~/pyapp_cpython
+        # sed -i 's/^.*filesystem_importer.*$/filesystem_importer=True,/' ~/pyapp_cpython/*.bzl
+        cp ci/cpython_test.bzl ~/pyapp_cpython/pyoxidizer.bzl
+        cat ci/cpython_test_runner.py | cargo run --bin pyoxidizer -- run ~/pyapp
+      displayName: CPython tests
