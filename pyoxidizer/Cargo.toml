@@ -22,8 +22,8 @@ vergen = "3"
 
 # Contains one fix needed for Windows
 [dependencies.object]
-git = "https://github.com/philipc/object.git"
-branch = "common"
+git = "https://github.com/gimli-rs/object.git"
+branch = "master"
 features = ["read", "std", "write"]
 
 [dependencies]
