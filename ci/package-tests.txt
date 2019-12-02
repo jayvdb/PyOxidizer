@@ -1,0 +1,257 @@
+git+https://github.com/micheles/decorator
+git+https://github.com/pavdmyt/yaspin
+git+https://github.com/mrocklin/multipledispatch
+
+orderedmultidict<1.0.1
+git+https://github.com/jayvdb/brotlipy@libbrotli-v1.0-support
+git+https://github.com/bskinn/stdio-mgr
+
+# workaround lack of pep 517 support
+git+https://github.com/jayvdb/cryptography#egg=cryptography
+git+https://github.com/jayvdb/bcrypt@no-pyproject#egg=bcrypt
+git+https://github.com/jayvdb/pynacl@no-pyproject#egg=PyNaCl
+unicodedata2
+jsonschema==3.0.2 # breaks httpbin
+git+https://github.com/RDFLib/rdflib
+git+https://github.com/jayvdb/cmd2@staticlib#egg=cmd2
+
+elementpath
+git+https://github.com/jayvdb/xmlschema@setup-requires
+
+pycurl
+tornado
+ZConfig
+networkx
+netifaces
+virtualenv
+wheel
+setuptools
+setuptools_scm
+packaging
+pip
+
+
+hashID
+lml
+
+backports.test.support
+class-proxy
+padme
+pipx
+vpip
+
+#grpcio build fails error: invalid argument '-std=gnu99' not allowed with 'C++'
+#w3af
+textstat
+pint
+docky
+tldextract
+argcomplete
+depfinder
+jsonrpcclient
+boto3
+#gltools
+#macaw drags in tensorflow without a sdist  {'macaw': 'macawspeak'},
+shovel
+#hash-identifier
+phabricator
+plotly
+text-unidecode
+#pwntools==4.0.0b0  depends on capstone & unicorn
+#capstone
+#unicorn
+#soweego
+
+# REQUIRE_SPEEDUPS=1
+simplejson
+MarkupSafe
+wcwidth
+
+#netmiko maybe this is where textfsm is coming from
+dulwich
+zstandard
+zstd
+xxhash
+netaddr
+ndg-httpsclient
+dparse
+docutils
+Mako
+python-dateutil
+xmltodict
+weakrefmethod
+jsonpointer
+jmespath
+immutables
+tabulate
+toml
+#tomlkit cleo/poetry
+#cleo
+tqdm
+sortedcontainers
+vcrpy
+pyparsing
+python-stdnum
+pyxattr
+# redis needs redis running
+requests-mock
+flexmock
+httmock
+mocket
+mockito
+mockldap
+#python-dbusmock  depends on dbus-python and gobject, etc
+#opengl
+#opengl-accelerate
+
+ordered-set
+objgraph
+multidict
+multi_key_dict
+mulpyplexer
+mongodict
+rcssmin
+wrapt
+titlecase
+Babel
+vistir
+xmldiff
+
+
+certifi
+#cryptography_vectors
+coverage # needed by pytest_cov
+pyOpenSSL
+requests[security,socks]
+PyYAML  # needed by httpbin->flasgger
+ruamel.yaml
+ruamel.std.pathlib  # test dep of ruamel.yaml
+
+
+
+psutil
+persistent
+multidict
+msgpack
+
+greenlet
+eventlet
+
+# linking failures
+#cmarkgfm
+Cython
+#git+https://github.com/jayvdb/lxml@test # doesnt work; need virtualenv with Cython preinstalled
+lxml #/lxml-4.3.1/src/lxml/isoschematron/__init__.py:
+#extras :
+#lxml[cssselect,html5,htmlsoup]
+gevent
+pyzmq
+
+cssselect
+html5lib
+
+aiohttp[speedups]
+
+#raven
+
+peewee
+coverage
+#argon2-cffi
+
+cffi
+
+git+https://github.com/jayvdb/toolz@no-__file__
+cytoolz
+lz4
+cchardet
+
+sentry-sdk
+
+
+# git+https://github.com/jayvdb/blist@test # blist + tests
+# not py37 compatible https://github.com/DanielStutzbach/blist/pull/78
+
+# not on pypi pychardet
+
+
+pyrsistent
+#pygit2
+
+regex
+
+bson
+
+
+#   = note: /usr/lib64/gcc/x86_64-suse-linux/9/../../../../x86_64-suse-linux/bin/ld: /home/jayvdb/pyox/requests-tests/build/target/x86_64-unknown-linux-gnu/debug/deps/libpyembed-f6d8ce5fcfbe2b59.rlib(config.o):(.data.rel._PyImport_Inittab+0x608): undefined reference to `PyInit__argon2'
+#          collect2: error: ld returned 1 exit status
+#argon2
+
+#Django
+Flask
+
+
+#dnspython causes all sorts of problems
+
+mock
+zope.event
+zope.interface
+zope.deprecation
+
+flask_login
+
+# looks like __file__ problems
+pygments
+
+SQLAlchemy
+attrs
+billiard
+
+black
+
+# kombu celery # https://github.com/celery/kombu/issues/1121
+
+certstream
+
+future
+PyX
+typeshed
+tinycss2
+pytimeparse
+python-whois
+# python-subunit, fails in testtools
+pymongo
+pyglet
+py2pack
+pycountry  # uses pkg_resources.resource_filename hack it!
+
+pefile
+pyelftools
+
+nltk  # looks ok
+
+kitchen
+httplib2
+#distorm3  # dso
+# dbf bytecompiler fails
+#cl became cell
+#cell & kombu
+
+blindspin
+click-completion
+jinja2
+shellingham
+click-help-colors
+click-spinner
+emoji
+pytz
+urllib3
+semver
+texttable
+websockets
+lark-parser
+rfc3986
+asn1crypto
+stdio-mgr
+bom-open
+click-aliases
+click-didyoumean

@@ -1,0 +1,12 @@
+
+Cython
+
+# REQUIRE_SPEEDUPS=1
+simplejson
+MarkupSafe
+
+git+https://github.com/jayvdb/brotlipy@libbrotli-v1.0-support
+
+git+https://github.com/jayvdb/cryptography#egg=cryptography
+
+pyzmq
