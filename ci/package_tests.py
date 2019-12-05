@@ -1,11 +1,50 @@
+run_all = False
+quit_early = False
+ignore_star_test_ignore = True  #False
+
+from pprint import pprint
+import importlib
+import os
+import os.path
+import sys
+
+dist_root = './build/target/x86_64-unknown-linux-gnu/debug/pyoxidizer/python.608871543e6d/python/install'
+dist_root = os.path.abspath(dist_root)
+cpython_root = dist_root + '/lib/python3.7/'
+
+os.environ['_PYTHON_PROJECT_BASE'] = dist_root
+sys._home = dist_root
+
+# This is needed to set base paths needed for sysconfig to provide the
+# correct paths, esp Python.h
+sys.base_exec_prefix = sys.exec_prefix = sys.base_prefix = sys.prefix = dist_root
+
+from distutils.sysconfig import get_python_lib  # used to determine stdlib
+
 import import_hooks
 
-# , '-pno:flaky'
-base_pytest_args = ['--continue-on-collection-errors', '-c', '/dev/null', '-rs', '--disable-pytest-warnings', '-pno:xdoctest'] #['-v',]
+# FIXME:
+_platbase = '/usr/lib64/python3.7/lib-dynload/'
+
+base_pytest_args = [
+    '--continue-on-collection-errors',
+    '-c/dev/null',  # TODO: make OS agnostic
+    '-rs',
+    '--disable-pytest-warnings',
+    #'--cache-clear',
+    '-pno:cacheprovider',
+    # Breaks --ignore
+    '-pno:xdoctest',
+    # Breaks --ignore https://github.com/bitprophet/pytest-relaxed/issues/8
+    '-pno:relaxed',
+    '-pno:flaky',
+    '-pno:doctestplus',  # breaks jsonpointer tests
+
+    # useful to check clashes of test packages with real packages
+    #'--import-mode=append',
+]
 base_pytest_args.append('--maxfail=10')
 
-run_all = False
-quit_early = True
 
 package_base_patterns = [
     '/home/jayvdb/projects/osc/d-l-py/python-{pypi_name}/{pypi_name}-{version}/',
@@ -20,17 +59,97 @@ package_base_patterns = [
     '/home/jayvdb/projects/osc/py-new/python-{pypi_name}/{pypi_name}-{version}/',
 ]
 
+
+
+class TestPackage:
+    def __init__(self, name, test_ignores=None, pypi_name=None, mod_name=None, version=None, other_mods=None):
+        self.pypi_name = pypi_name or name
+        self._mod_name = mod_name or name.replace('-', '_')
+        self._mods = [self.mod_name] + (other_mods or [])
+        self.version = version
+        self.test_ignores = test_ignores
+
+    @property
+    def _mod_is_default(self):
+        return self.mod_name == self.pypi_name.replace('-', '_')
+
+    @property
+    def mod_name(self):
+        return self._mod_name
+
+    @mod_name.setter
+    def mod_name(self, value):
+        self._mod_name = value
+        self._mods[0] = value
+
+    def __str__(self):
+        return self._mod_name
+
+    def __repr__(self):
+        return f'TestPackage({self.pypi_name})'
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return other in self._mods
+        return super().__eq__(other)
+
+    def __contains__(self, item):
+        if item in self._mods:
+            #print('__contains__ {!r} {!r}'.format(self._mods, item))
+            return True
+        for mod in self._mods:
+            if item.startswith(mod + '.'):
+                return True
+        return False
+
+    def __hash__(self):
+        return hash(self._mod_name)
+
+
 # These looks like tests, but are not
 not_tests = ['jinja2.tests']
 
 no_load_packages = [
+    # setuptools loads lib2to3, which tries to load its grammar file
+    'lib2to3',
+
     # https://github.com/HypothesisWorks/hypothesis/issues/2196
     # 'hypothesis', 'hypothesis.extra.pytestplugin',
-    # 'coverage' is in lib64
-    #'pytest_cov', 'pytest_cov.plugin',
+
+    # urllib3 uses built extension brotli if present
+    # however it is needed by httpbin
+    # 'brotli',
+    # requests uses built extension simplejson if present
+    'simplejson',
+    # hypothesis uses django and numpy if present,
+    # and those cause built extensions to load
+    'django', 'numpy',
+    # Other packages which will load built extension
+    #'flask',
+    'scandir',
+]
+import_hooks.add_import_error(no_load_packages)
+
+import_hooks.add_empty_load([
+    # 'pytest-cov' and 'coverage' may exist commonly in site-packages,
+    # however coverage uses a built extension which we do not want to load
+    'pytest_cov', 'pytest_cov.plugin',
+    'django_webtest.pytest_plugin', 'django_webtest',
+    # Other pytest plugins which might be loaded
+    'celery', 'celery.contrib.pytest',
+    # 'pytest_xprocess',
+
+    # pluggy imports this on py37 :/
+    #'importlib_metadata',
+])
+
+
+
+empty_load_packages = [
+    # ---- old stuff:
 
     # depends on PyYAML
-    'pytest_httpbin.plugin',
+    # 'pytest_httpbin.plugin',
 
     # __file__
     'cell',  # https://github.com/celery/cell/issues/21
@@ -57,14 +176,12 @@ no_load_packages = [
     'antigravity',
 ]
 
-import_hooks.add_no_load(no_load_packages)
-f = import_hooks.add_no_load(['networkx.algorithms.tree.recognition'])
-print(f)
+import_hooks.add_empty_load(empty_load_packages)
+
 import_hooks.add_junk_file_dunder([
-    'distorm3',
     'pluggy',
-    'coverage.html', 'coverage.control', 'pycparser.c_lexer', 'pycparser.c_parser',
-    'httplib2', 'httplib2.certs',
+    'coverage.html', 'coverage.control',
+    'pycparser.c_lexer', 'pycparser.c_parser',
     'ruamel.yaml.main',
     'tqdm._version',
     'networkx.release', 'networkx.generators.atlas',
@@ -72,10 +189,20 @@ import_hooks.add_junk_file_dunder([
     'botocore', 'botocore.httpsession',
 ])
 
+
+import_hooks.add_after_import_hook(
+    ['certifi.core'],
+    import_hooks.certifi_where_hack,
+)
+
+import_hooks.add_empty_load(no_load_packages)
+f= import_hooks.add_empty_load(['networkx.algorithms.tree.recognition'])
 import networkx
 import_hooks.unregister_import_hook(f)
+
 import sys
 del sys.modules['networkx.algorithms.tree.recognition']
+
 import networkx.algorithms.tree.recognition
 print(networkx.algorithms.tree.recognition.__spec__)
 
@@ -92,32 +219,43 @@ import_hooks.overload_open(['pycountry', 'pycountry.db', 'stdlib_list.base'])
 # doesnt work:
 #import_hooks.redirect_get_data_resources_open_binary(['yaspin'], is_module=True)
 
-
-import_hooks.add_after_import_hook(
-    ['certifi.core'],
-    import_hooks.certifi_where_hack,
-)
-
-#import certifi.core
-#certifi.core.where()
-#open(certifi.core.where())
-
-import os
-import pytest
-import sys
-import importlib
+#pytest.main(['-v', '-pno:django', '/home/jayvdb/projects/osc/d-l-py/python-mock/mock-2.0.0/mock/tests/__main__.py'])
 
 
-pyox_finder = None
+#import_hooks.overload_open(['lark.load_grammar', 'lark.tools.standalone'], is_module=True)
+
+# needs to be before! during exec
+#import_hooks.overload_open(['netaddr.eui.ieee', 'netaddr.ip.iana'], is_module=True)
+
+
+# dont work: 'phabricator', 'tldextract', 's3transfer'
+import_hooks.overload_open(['whois', 'depfinder', 'virtualenv'])
+
+# for tinycss2
+#import pathlib
+#pathlib._NormalAccessor.open = pathlib._normal_accessor.open = import_hooks._catch_fake_open
+
+# This module is unusable unless another import hook is created
+#import_hooks.add_external_file_dunder(cpython_root, ['lib2to3.pygram'])
+
+# black:
+import_hooks.add_relocated_external_file_dunder(cpython_root, 'blib2to3.pygram', 'b')
+
+import_hooks.add_file_dunder_during(cpython_root, 'test_future.test_imports_urllib', 'urllib')
+import_hooks.add_file_dunder_during(cpython_root, 'greenlet', 'distutils')
+import_hooks.add_file_dunder_during(cpython_root, 'hypothesis', 'os')
+
+#import_hooks.add_external_file_dunder( , 'tornado.testing')
+
+#import_hooks.add_relocated_external_file_dunder(
+#    cpython_root, "blist.test.test_support", "blist")
+#import blist.test.test_support
+
 assert sys.oxidized
 pyox_finder = sys.meta_path[0]
 _pyox_modules = list(pyox_finder.package_list())
 
-
-from distutils.sysconfig import get_python_lib
-from importlib import import_module
-PY2 = False
-
+# pyox_finder.__spec__.__module__ = None
 
 def aggressive_import(name):
     if 'python-' in name:
@@ -194,13 +332,10 @@ def aggressive_import(name):
     raise ImportError('{} not found'.format(name))
 
 
-def _find_version(mod):
+def _find_version(mod, verbose=False):
+    name = mod.__name__
+
     version = None
-    try:
-        data = importlib.resources.open_binary(mod.__name__, 'VERSION').read()
-        return data.decode('utf-8').strip()
-    except Exception as e:
-        print('VERSION: ', e)
 
     try:
         version = mod.__version__
@@ -213,25 +348,56 @@ def _find_version(mod):
             except AttributeError as e2:
                 pass
 
+    if not version or name == 'pytimeparse':
+        try:
+            data = importlib.resources.open_binary(name, 'VERSION').read()
+            return data.decode('utf-8').strip()
+        except Exception as e:
+            if verbose:
+                print('_find_version({}): no file VERSION failed: {!r}'.format(name, e))
+
     if not version:
         try:
-            v_mod = __import__(mod.__name__ + '.version', mod.__name__)
-            print('imported {!r}'.format(v_mod))
+            """v_mod = __import__(mod.__name__ + '.version', mod.__name__)
+            if verbose:
+                print('imported {!r}'.format(v_mod))
             v_mod = v_mod.version
-            print('found version {!r}'.format(v_mod))
-            version = v_mod.version
-            print('found version {!r}'.format(version))
-        except ImportError:
-            raise ImportError("Cant find version for {}".format(mod.__name__))
+            if verbose:
+                print('found version {!r}'.format(v_mod))
+            """
+            v_mod = importlib.import_module(mod.__name__ + '.version')
+            if verbose:
+                print('imported {!r}'.format(v_mod))
+        except ImportError as e:
+            if verbose:
+                print('_find_version({}): {!r}'.format(name, e))
+        else:
+            try:
+                version = v_mod.__version__
+            except AttributeError:
+                version = v_mod.version
+            if verbose:
+                print('found version {!r}'.format(version))
 
     if not version:
         try:  # pipx
             v_mod = __import__(mod.__name__ + '.main', fromlist=['main'])
-            print('imported {!r}'.format(v_mod))
+            if verbose:
+                print('imported {!r}'.format(v_mod))
             version = v_mod.__version__
-            print('found version {!r}'.format(v_mod))
-        except ImportError:
-            raise ImportError("Cant find version for {}".format(mod.__name__))
+            if verbose:
+                print('found version {!r}'.format(v_mod))
+        except (AttributeError, ImportError) as e:
+            if verbose:
+                print('_find_version({}): {!r}'.format(name, e))
+
+    if name.startswith('unicodedata'):  # also includes unicodedata2
+        version = mod.unidata_version
+
+    if not version:
+        if verbose:
+            print(f'version not found for {mod}')
+        return
 
     try:
         version = version()
@@ -241,12 +407,16 @@ def _find_version(mod):
     if isinstance(version, tuple):
         version = '.'.join(str(i) for i in version)
 
+    if verbose:
+        print('_find_version({}) = {}'.format(mod, version))
+
     return version
 
-def _find_tests_under(base, mod_name):
+def _find_tests_under(base, mod_name, verbose=False):
     base = base + '/' if not base.endswith('/') else base
 
-    print('looking under {}'.format(base))
+    if verbose:
+        print('looking under {}'.format(base))
 
     # peewee if os.path.exists(base + 'runtests.py'):
     #    return 'runtests.py'
@@ -259,12 +429,18 @@ def _find_tests_under(base, mod_name):
             return 'tests/test.py'
         if os.path.exists(base + 'tests/tests.py'):
             return 'tests/tests.py'
+        if os.path.exists(base + 'test.py'):  # chardet 4 has tests/ and test.py
+            return 'test.py'
         return 'tests/'
     if os.path.exists(base + 'tests.py') and mod_name + '.tests' not in not_tests:
         return 'tests.py'
     elif os.path.exists(base + 'test_' + mod_name + '.py'):  # six
         return 'test_' + mod_name + '.py'
-    elif os.path.isdir(base + 'test/'):
+    elif os.path.exists(base + 'simple_unit_tests.py'):  # pyparsing
+        return 'simple_unit_tests.py'
+    elif os.path.exists(base + 'unitTests.py'):  # pyparsing not working
+        return 'unitTests.py'
+    elif os.path.isdir(base + 'test/'):  # todo: check for .py files
         return 'test/'
     elif os.path.isdir(base + '_test/'):  # ruamel.yaml
         return '_test/'
@@ -272,7 +448,7 @@ def _find_tests_under(base, mod_name):
         return 'testing/'
     elif os.path.isdir(base + 'ast3/tests/'):  # typed-ast
         return 'ast3/tests/'
-    elif os.path.isdir(base + 't/'):  # vine
+    elif os.path.isdir(base + 't/'):  # celery: vine & billiard
         if os.path.exists(base + 't/integration/tests/test_multiprocessing.py'):
             return 't/unit/'  # billiard ^ is py2 only
         return 't/'
@@ -280,9 +456,28 @@ def _find_tests_under(base, mod_name):
         return 'test.py'
 
 
+PY2 = False
+py37_builtins = ('_abc', '_ast', '_codecs', '_collections', '_functools', '_imp', '_io', '_locale', '_operator', '_signal', '_sre', '_stat', '_string', '_symtable', '_thread', '_tracemalloc', '_warnings', '_weakref', 'atexit', 'builtins', 'errno', 'faulthandler', 'gc', 'itertools', 'marshal', 'posix', 'pwd', 'sys', 'time', 'xxsubtype', 'zipimport')
 
-def package_versions(modules=None, builtins=False, standard_lib=None, not_imported=False,
-                     std_lib_dir=None):
+def _is_std_lib(name, std_lib_dir):
+    name, _, _ = name.partition('.')
+    if name in py37_builtins:
+        return True
+    elif name in ['__phello__', 'config-3', '_frozen_importlib', '_frozen_importlib_external'] or name.startswith('config_3'):
+        return True
+    elif name in ['_pyoxidizer_importer']:
+        return True
+    rv = (os.path.isdir(std_lib_dir + name)
+          or os.path.exists(std_lib_dir + name + '.py')
+          or os.path.exists(_platbase + name + '.cpython-37m-x86_64-linux-gnu.so')  # TODO: use plat extension
+          )
+    #print('_is_std_lib', name, std_lib_dir)
+    return rv
+
+
+def package_versions(modules=None, builtins=None, namespace_packages=None,
+                     standard_lib=None, exclude_imported=False,
+                     std_lib_dir=None, verbose=False, exclude=None, exclude_main=True):
     """Retrieve package version information.
 
     When builtins or standard_lib are None, they will be included only
@@ -304,38 +499,67 @@ def package_versions(modules=None, builtins=False, standard_lib=None, not_import
         std_lib_dir + '/' if not std_lib_dir.endswith('/') else std_lib_dir)
 
     root_packages = {key.split('.')[0] for key in modules}
+    namespace_subpackages = set()
+    for nspkg in namespace_packages or []:
+        if nspkg not in root_packages:
+            continue
+        submodules = {'.'.join(key.split('.')[:2]) for key in modules if key.startswith(nspkg + '.')}
+        namespace_subpackages |= submodules
 
     builtin_packages = {name.split('.')[0] for name in root_packages
                         if name in sys.builtin_module_names
                         or '_' + name in sys.builtin_module_names}
 
+    if standard_lib is False and builtins is None:
+        builtins = False
+
     # Improve performance by removing builtins from the list if possible.
     if builtins is False:
-        root_packages = list(root_packages - builtin_packages)
+        root_packages = set(root_packages - builtin_packages)
+    if exclude_main:
+        root_packages -= {'__main__'}
+
+    if verbose:
+        print('root packages:', sorted(root_packages))
 
     std_lib_packages = []
 
     paths = {}
     data = {}
 
-    for name in root_packages:
-        # print('About to import {}'.format(name))
-        if not_imported and name in sys.modules:
+    for name in sorted(root_packages | namespace_subpackages):
+        if exclude and name in exclude:
             continue
 
-        try:
-            package = import_module(name)
-        except Exception as e:
-            print('import_module({}) failed: {!r}'.format(name, e))
-            data[name] = {'name': name, 'err': e}
-            continue
+        info = {'name': name}
 
-        info = {'package': package, 'name': name}
+        if _is_std_lib(name, std_lib_dir):
+            std_lib_packages.append(name)
+            if standard_lib is False:
+                continue
+            info['type'] = 'standard libary'
 
         if name in builtin_packages:
             info['type'] = 'builtins'
 
-        if '__file__' in package.__dict__:
+        # print('About to import {}'.format(name))
+        if exclude_imported and name in sys.modules:
+            if verbose:
+                print(f'Skipping {name}')
+            continue
+
+        try:
+            package = importlib.import_module(name)
+        except Exception as e:
+            if verbose:
+                print('import_module({}) failed: {!r}'.format(name, e))
+            info['err'] = e
+            data[name] = info
+            continue
+
+        info['package'] = package
+
+        if '__file__' in package.__dict__ and package.__file__:
             # Determine if this file part is of the standard library.
             if os.path.normcase(package.__file__).startswith(
                     os.path.normcase(std_lib_dir)):
@@ -353,23 +577,18 @@ def package_versions(modules=None, builtins=False, standard_lib=None, not_import
                 path = path.decode(sys.getfilesystemencoding())
 
             info['path'] = path
-            assert path not in paths, 'Path {} of the package is in defined paths {}'.format(path, paths)
+            assert path not in paths, 'Path {} of the package {} is in defined paths {}'.format(path, package, paths)
             paths[path] = name
         else:
-            if (os.path.isdir(std_lib_dir + package.__name__) or
-                    os.path.exists(std_lib_dir + package.__name__ + '.py')):
+            if _is_std_lib(name, std_lib_dir):
                 std_lib_packages.append(name)
                 if standard_lib is False:
                     continue
                 info['type'] = 'standard libary'
 
-        if name.startswith('unicodedata'):
-            info['ver'] = package.unidata_version
-        else:
-            try:
-                info['ver'] = _find_version(package)
-            except Exception:
-                pass
+        version = _find_version(package)
+        if version:
+            info['ver'] = version
 
         # If builtins or standard_lib is None,
         # only include package if a version was found.
@@ -387,40 +606,47 @@ def package_versions(modules=None, builtins=False, standard_lib=None, not_import
 
 
 
-def run_pytest(pypi_name=None, mod_name=None, version=None, test_path=None, excludes=[], add_test_file_dunder=False):
-    print('run_pytest {} {} {}'.format(pypi_name, mod_name, version))
-    if mod_name:
+def run_pytest(package, test_path=None, add_test_file_dunder=False, verbose=False):
+    pypi_name = package.pypi_name
+    mod_name = package.mod_name
+    version = package.version
+    excludes = package.test_ignores
+
+    if verbose:
+        print('run_pytest {} {} {}'.format(pypi_name, mod_name, version))
+
+    import pytest
+
+    if not package._mod_is_default:
         mod = aggressive_import(mod_name)
     else:
         try:
             mod = aggressive_import(pypi_name)
-        #except ImportError as e:
-        #    return "Skipping {}: {!r}".format(pypi_name, e)
         except Exception as e:
-            print("aggressive_import {} failed: {!r}".format(pypi_name, e))
+            if verbose:
+                print("aggressive_import {} failed: {!r}".format(pypi_name, e))
             raise e
-        mod_name = mod.__name__
-
-    print('run_pytest {} {} {}'.format(pypi_name, mod_name, version))
+        package.mod_name = mod_name = mod.__name__
 
     if not version:
-        try:
-            version = _find_version(mod)
-        except ImportError as e:
-            return e
+        version = _find_version(mod, verbose=verbose)
 
-    print('run_pytest {} {} {}'.format(pypi_name, mod_name, version))
+    print('\nrun_pytest {} {} {}'.format(pypi_name, mod_name, version))
 
-    if mod_name != pypi_name:
-        print('{}({}) = {}'.format(pypi_name, mod_name, version))
-    else:
-        print('{} = {}'.format(pypi_name, version))
+    if verbose:
+        if not package._mod_is_default:
+            print('{}({}) = {}'.format(pypi_name, mod_name, version))
+        else:
+            print('{} = {}'.format(pypi_name, version))
+
     found_bases = []
+    hooks = []
     for pattern in package_base_patterns:
         package_base = pattern.format(
            pypi_name=pypi_name, mod_name=mod_name, version=version, version_major=version[0] if isinstance(version, str) else None)
         if os.path.isdir(package_base):
-            print('run_pytest found {}'.format(package_base))
+            if verbose:
+                print('run_pytest found {}'.format(package_base))
             found_bases.append(package_base)
             if not test_path:
                 mod_path = mod_name.replace('.', '/')
@@ -467,7 +693,7 @@ def run_pytest(pypi_name=None, mod_name=None, version=None, test_path=None, excl
                         package_base += mod_name + '_3/'
                         test_path = mod_name + '/' + test_path
                         add_test_file_dunder = test_path
-                if not test_path:
+                if not test_path and verbose:
                     print('Couldnt find tests under {}'.format(package_base))
 
             if test_path:
@@ -486,503 +712,105 @@ def run_pytest(pypi_name=None, mod_name=None, version=None, test_path=None, excl
         if add_test_file_dunder.endswith('.'):
             add_test_file_dunder = add_test_file_dunder[:-1]
         if add_test_file_dunder not in not_tests:
-            print('Adding __file__ for {}'.format(add_test_file_dunder))
-            import_hooks.add_external_file_dunder(package_base, [add_test_file_dunder])
+            #if verbose:
+            print('Adding __file__ for {} @ {}'.format(add_test_file_dunder, package_base))
+            hooks.append(import_hooks.add_external_file_dunder(package_base, [add_test_file_dunder]))
 
     if mod_name == 'tornado':
-        import_hooks.add_external_file_dunder(package_base, ['tornado.testing'])
+        hooks.append(import_hooks.add_external_file_dunder(package_base, ['tornado.testing']))
 
     pytest_args = base_pytest_args.copy()
+    if mod_name == 'billiard':
+        pytest_args.remove('-c/dev/null')
 
     if mod_name == 'ruamel.yaml':
         pytest_args += ['--ignore', '_test/lib']
 
-    pytest_args.append(package_base + test_path)
+    if excludes:
+        ignores = [item for item in excludes if item.endswith('/') or item.endswith('.py')]
+        excludes = [item for item in excludes if item not in ignores]
+        for item in ignores:
+            pytest_args.append('--ignore-glob=*' + item)
+
+    if excludes and '*' in excludes:
+        excludes.remove('*')
+
     if excludes:
         if len(excludes) == 1:
             pytest_args += ['-k', 'not {}'.format(excludes[0])]
         else:
             pytest_args += ['-k', 'not ({})'.format(' or '.join(excludes))]
 
+    pytest_args.append('./' + test_path)
+
     os.chdir(package_base)
-    print("Running {}-{} tests: pytest {}".format(pypi_name, version, pytest_args))
-    return pytest.main(pytest_args)
+    print("Running {}-{} tests: {}> pytest {}".format(pypi_name, version, package_base, pytest_args))
+    rv = pytest.main(pytest_args)
+    for hook in hooks:
+        import_hooks.unregister_import_hook(hook)
+    return rv
 
 
-def remove_test_modules():
-    for name in list(sys.modules.keys()):
-        if name.startswith('test_') or name.endswith('_test') or name.startswith('test.') or name.startswith('tests.') or name in ['test', 'tests', 'conftest']:
+def remove_test_modules(verbose=False):
+    for name in sorted(sys.modules.keys()):
+        if name.startswith('test_') or name.endswith('_test') or name.startswith('test.') or name.startswith('tests.') or name in ['linecache', 'test', 'tests', 'conftest'] or name.startswith('pytest') or name.startswith('_pytest') or name == 'py' or name.startswith('py.'):
+           if verbose:
+               print('removing imported {}'.format(name))
            del sys.modules[name]
 
-skip_completed = [
-    # should be patched!?  but green with one exclusion
-    'toolz', 'cytoolz',
+    #assert 'tests' not in sys.modules
+    #print(sorted(sys.modules))
+    #import tests
+    #print(tests.__file__)
+    #assert 'kitchen3' not in tests.__file__
 
-    # green
-    'simplejson', 'MarkupSafe', 'idna', 'yarl', 'multidict', 'pyOpenSSL', 'msgpack',
-    'wheel',
-    'aiodns', 'dnspython',
-    'ptyprocess',
-    'rfc3986',
-    'vine',
-    'kitchen',
-    'colorama',
-    'Flask',
-    'Jinja2',
-    {'attr': 'attrs'},  # mod, package
-    'texttable',
-    'click-spinner',
-    'emoji',
-    'soupsieve',
-    'jsonpointer',
-    'dulwich',
-    'xmltodict',
-    'jmespath',
-    'titlecase',
-    'tabulate',
-    'pyxattr',
-    'wrapt',
-    'multipledispatch',
-    'pyasn1',
-    'ordered-set',
-    'toml',
-    'orderedmultidict',  # v1.0.1 needs __file__ to supply __version__
-    'dparse',
-    'click-didyoumean',
-    'cached-property',
-    'pluggy',
-    'userpath',
-    'pyserial',
-    'pathspec',
-    'pyperclip',
-    'bcrypt',  # pep 517
-    'rdflib',  # master, unreleased
-    'PyNaCl',
-    'ConfigUpdater',
-    'itsdangerous',
-
-    'aiohttp',  # opensuse outdated
-    'future',  # opensuse outdated
-    'six',  # opensuse outdated
-    'semver',  # opensuse outdated
-    'shellingham',
-    'websockets',  # opensuse outdated
-    'asn1crypto',  # opensuse outdated
-    'decorator',  # ??
-    'immutables',  # outdated
-    'python-stdnum',  # outdated
-    'zstd',  # outdated
-    'pytz',  # opensuse outdated  pytz:95: in open_resource  NameError: name '__file__' is not defined
-    'regex',  # opensuse outdated; depends on `test.support`
-    'xxhash',  # outdated
-    'SQLAlchemy',  # outdated
-    'graphviz',  # outdated
-    'python-slugify',  # outdated
-
-    # green; no version
-    ('repoze.lru', '0.7'),
-    ('zope.interface', '4.6.0'),
-    ('zope.event', '4.4'),
-    ('zope.deprecation', '4.4.0'),
-    ('persistent', '4.5.0'),
-    ('zipp', '0.6.0'),
-    ('wcwidth', '0.1.7'),
-    ('isodate', '0.6.0'),
-    {'lark': ('lark-parser', '0.7.7')},
-    ('httmock', '1.3.0'),
-    ('backports.test.support', '0.1.1'),
-    ('click-aliases', '1.0.1'),
-    ('blindspin', '2.0.1'),
-    ('class-proxy', '1.1.0'),
-
-    # test collection needs help
-    'pytimeparse',  # passes if I do `ln -s testtimeparse.py test_timeparse.py`
-    'cChardet',  # opensuse no have  `mv test.py test_cChardet.py`
-    'click',  # ln -s Click-7.0 click-7.0
-    'weakrefmethod',  # ln -s test_weakmethod.py test_weakrefmethod.py
-    'sortedcontainers',  # ln -s python-sortedcontainers-2.1.0 sortedcontainers-2.1.0
-    'billiard',
-    'precis-i18n',  # ln -s precis_i18n-1.0.0 precis-i18n-1.0.0
-    'filelock',  # ln -s py-filelock-3.0.12 filelock-3.0.12
-    'typed-ast',  # ln -s typed_ast-1.4.0 typed-ast-1.4.0
-    ('text-unidecode', '1.3'),  # ln -s test_unidecode.py test_text_unidecode.py
-
-    # no tests
-    ('certstream', '1.10'),  # https://github.com/CaliDog/certstream-python/issues/29
-    'click-completion',  # outdated
-    ('mulpyplexer', '0.08'),
-    ('click-help-colors', '0.6'),  # has tests in master, but incompatible with 0.6
-    'hashID',  # no tests, but broken https://github.com/psypanda/hashID/issues/47
-    'stdlib-list',
-    'termcolor',
-
-    # substantial failures; pytz
-    'cryptography',
-    'pygments',  # one failure testColonInComment , yaml error
-    'requests',
-    'lz4',  # outdated
-    'ruamel.yaml',  # upstream issue
-    ('python-whois', '0.7.2'),  # outdated __file__ ; very weird use of os.getcwd()
-    ('pycountry', '18.12.8'),  # exposes LOCALE_DIR, etc which will fail even if internal access is fixed
-    ('brotlipy', '0.7.0'),
-    'networkx',  # outdated ; hack needs polishing
-    'python-dateutil',  # outdated , serious tz issues
-    'plumbum',
-
-    # skipping
-    'sentry_sdk',  #imports other stuff which breaks stuff
-    'raven',  # https://github.com/getsentry/raven-python/issues/1353
-    'cssselect',  #depends on lxml
-    'psutil',  #need to set TRAVIS
-    'cmd2', # https://github.com/python-cmd2/cmd2/issues/802
-    'blist', # not py37 compat
-    'urllib3', # needs tornado special version? [pytest] section in setup.cfg files is no longer supported, change to [tool:pytest] instead
-    'phabricator', #  __file__ & open during exec
-    'tldextract', #  __file__ & open during exec
-    'vpip', # fails in pip
-    'pyglet',  # outdated  ModuleNotFoundError: No module named 'tests.interactive.interactive_test_base'
-
-    'textstat',  # fails due to pyphen
-    'vistir',  # fails due to yaspin
-    'Mako', # fails due to Babel
-    'plotly', # fails due to Babel
-    'pint', # fails due to Babel
-    's3transfer',  # fails due to boto
-    ('vcrpy', '2.0.1'), # needs httpbin; fails in boto
-
-    # unnecessary
-    'tlz',  # part of toolz
-    'past',  # part of future
-    '_pyrsistent_version',  # part of pyrsistent
-    'ldapurl',  # part of ldap
-    'peutils',  # part of pefile
-]
-
-
-#pytest.main(['-v', '-pno:django', '/home/jayvdb/projects/osc/d-l-py/python-mock/mock-2.0.0/mock/tests/__main__.py'])
-
-
-#import_hooks.overload_open(['lark.load_grammar', 'lark.tools.standalone'], is_module=True)
-
-# needs to be before! during exec
-#import_hooks.overload_open(['netaddr.eui.ieee', 'netaddr.ip.iana'], is_module=True)
-
-
-# dont work: 'phabricator', 'tldextract', 's3transfer'
-import_hooks.overload_open(['whois', 'depfinder', 'virtualenv'])
-
-# for tinycss2
-#import pathlib
-#pathlib._NormalAccessor.open = pathlib._normal_accessor.open = import_hooks._catch_fake_open
-
-# for Pyphen needs os.listdir hacked
-import pkg_resources
-def fake_resource_filename(package, name):
-    return '{}/{}/{}'.format(import_hooks._fake_root, package, name)
-
-pkg_resources.resource_filename = fake_resource_filename
-
-#'gridfs', part of pymongo
-#pvectorc is part of pyrsistent
-#tornado/speedups
-
-packages = [
-    #'netaddr', #  __file__ causes some failures
-    #'yaspin',  # __file__ still failing
-    #'Pyphen',  # uses os.listdir  https://github.com/Kozea/Pyphen/issues/25
-    # 'tinycss2',  # __file__, but uses pathlib, which is impenetrable  https://github.com/Kozea/tinycss2/issues/21
-
-    #'PyX',  # File "pyx.config", line 305, in <module> IndexError: list index out of range.  Suspect that pyox is only using package top level name for package name
-    #'Werkzeug',  # lots of errors
-    #'botocore',
-    'boto',  # depends on botocore
-    'boto3',  # depends on botocore  # AttributeError: module 'boto3' has no attribute '__file__'
-
-    #'docker',  # outdated , depends on _bcrypt & nacl._sodium ; significant failures
-    #{'compose': 'docker-compose'},
-    #...,
-
-    'pefile',
-    ...,
-
-
-    ('bson', '0.5.8'),
-    'tornado',
-
-    'chardet',
-    'rcssmin',  # custom test runner run_tests.py
-
-    'greenlet',  # Python.h
-
-
-    'pyelftools',
-
-    # redo
-    'psutil',  #need to set TRAVIS
-
-    # 'nltk',  # depends on all of its data
-
-    # 'jsonschema',  # File "jsonschema._utils", line 58, in load_schema AttributeError: 'NoneType' object has no attribute 'decode'
-    'ZConfig',  # version problem 3.0 vs 3.5.0
-
-    'netmiko',
-    'paramiko',
-    'distro',
-    ('funcparserlib', '0.3.6'),
-    'ldap',
-    'mockito',
-    ('monotonic', '1.5'),
-    'py',
-    'lml',
-    'logutils',
-    ('rainbow_logging_handler', '2.2.2'),
-    ('case-conversion', '2.1.0'),
-    #'ropgadget', depends on capstone  https://github.com/aquynh/capstone/blob/master/bindings/python/capstone/__init__.py
-    #'unicorn', File "unicorn.unicorn", line 94, in <module> ImportError: ERROR: fail to load the dynamic library.  https://github.com/unicorn-engine/unicorn/tree/master/bindings/python/unicorn  shared lib only
-    #'virtualenv',  lots of errors
-    'capstone',
-    'flexmock',
-    'mocket',
-    'tox' # File "tox.constants", line 9, in <module> NameError: name '__file__' is not defined
-
-    'Babel', # fails
-
-    # lots of failures
-    #('ndg-httpsclient', '0.5.1'),  # ln -s ndg_httpsclient-0.5.1 ndg-httpsclient-0.5.1
-
-
-    # 'docutils', 2to3
-    # 'redis',  # outdated  needs local redis
-
-    # 'objgraph', different results
-    #('multi_key_dict', '2.0.3')  # no tests?
-    #'mongodict',  # use github ; relies on pymongo
-
-
-
-    # 'tqdm',  # outdated   tests do not run
-    # 'pyparsing',  # outdated
-    # 'zstandard', compiled bits missing
-
-
-    #'mock',  # mock.tests is empty
-
-    #'peewee',
-
-
-
-    #'pymongo',  # ModuleNotFoundError: No module named 'test.version'
-    #'cell',
-    'httplib2',
-
-    #'pycparser',
-    #'cffi',
-    #'Django',
-
-    'Flask-Login', # tests not in opensuse
-
-
-
-    ('argcomplete', '1.10.0'),
-    # 'distorm3',  # __file__ ;extlib  https://github.com/gdabah/distorm/issues/142
-    #{'pwnlib': 'pwntools'},  # https://github.com/Gallopsled/pwntools/issues/1366
-
-
-    ('jsonrpcclient', '3.3.4'),  # no tests in sdist; get github
-    'depfinder',  # fails __file__ even with hack
-
-    ('requests-file', '1.4.3'),
-    ('retrying', '1.3.3'),
-    # ('shovel', '0.4.0'),  # all failing
-    'pipx',
-
-    'importlib-metadata',  # ln -s importlib_metadata-0.17 importlib-metadata-0.17  (0.17 is old..??)
-    #'pycares',
-    #('typeshed', '0.0.1'),
-
-    #'coverage',
-    # 'greenlet',  fatal error: 'Python.h' file not found
-    #
-    # fails in tests?
-
-    #'PySocks', from test_server import TestServer  E       ModuleNotFoundError: No module named 'test_server'
-
-
-
-    # conflicts with `test`
-    #'pygit2',
-
-    # incompatible with pytest
-    #'async_timeout',  #  ln -s async-timeout-3.0.1 async_timeout-3.0.1  #fixture 'event_loop' not found
-    # 'stdio-mgr',
-    # ('bom-open', '0.4'),  # depends on stdio-mgr
-    #'xdoctest', uses its own pytest plugin, which cant be found in pyox
-    # 'html5lib',  # ERROR collecting test_stream.py; then incompatible with pytest
-    #'black',  # opensuse outdated
-    # 'PyYAML',
-    # 'packaging',
-
-    # other not usable
-    # {'clitable': 'textfsm'}, # conflicts with texttable
-]
-# mock: AttributeError: module 'mock.tests' has no attribute 'testpatch'
-test_package_excludes = {
-    'six': ['test_lazy'],  # assertion fails due to other packages; not worth isolating
-    'wheel': ['test_bdist_wheel', 'test_tagopt'],  # uses sys.executable
-    'importlib-metadata': ['test_zip'],
-    'simplejson': ['TestTool'],
-    'tabulate': ['test_cli'],
-    'zstd': ['test_version'],
-    'virtualenv': ['test_cmdline'],
-    'jsonschema': ['test_cli'],
-    'logutils': ['test_hashandlers'],  # unknown
-    'billiard': ['integration'],
-    'cached-property': ['test_threads_ttl_expiry'],
-    'dparse': ['test_update_pipfile'],
-    'backports.test.support': ['test_assert_python_failure', 'test_assert_python_ok_raises'],  # cli
-    'dulwich': [
-        'test_blackbox', 'GitReceivePackTests', 'test_missing_arg',  # subprocess
-    ],
-    'botocore': [  # supposed to use nose test runner
-        'test_client_method_help', 'test_paginator_help_from_client', 'test_waiter_help_documentation',  # help() not included in PyOxidizer
-        'test_dynamic_client_error', 'test_s3_special_case_is_before_other_retry', 'test_s3_addressing', 'TestCreateClient', 'TestClientMonitoring', 'TestSessionPartitionFiles', 'TestGenerateDBAuthToken', 'test_internal_endpoint_resolver_is_same_as_deprecated_public', # botocore.session:160: in create_default_resolver botocore.loaders:132: in _wrapper  botocore.exceptions.DataNotFoundError: Unable to load data for: endpoints
-        'CloudFrontWaitersTest',  # botocore.exceptions.DataNotFoundError: Unable to load data for: cloudfront
-        'TestGenerateDocs', 'TestClientDocumenter', 'test_example', 'test_method', 'docs',  # botocore.exceptions.DataNotFoundError: Unable to load data for: _retry
-        'test_get_response_nonstreaming_ng', 'test_get_response_nonstreaming_ok', 'test_get_response_streaming_ng', 'test_get_response_streaming_ok', 'TestGenerateUrl',  'TestGeneratePresignedPost', # session.get_service_model('s3') botocore.exceptions.UnknownServiceError: Unknown service: 's3'. Valid service names are:
-    ],
-    'pyelftools': ['run_examples_test'],
-    'pyperclip': ['TestKlipper'],  # KDE service
-    'Werkzeug': ['test_no_memory_leak_from_Rule_builder', 'test_find_modules'],
-    'python-dateutil': [
-        'testAmbiguousNegativeUTCOffset', 'testAmbiguousPositiveUTCOffset', 'ZoneInfoGettzTest',  # tz problems
-        'testPickleZoneFileGettz', 'testPickleZoneFileGettz',
-    ],
-    'brotlipy': [
-        'test_streaming_compression', 'test_streaming_compression_flush',  # they take too long to complete
-        'test_compressed_data_with_dictionaries',  # removed functionality in brotli 1.x
-    ],
-    'plumbum': [
-        'test_sudo', 'test_remote', 'test_copy_move_delete',
-        'test_slow', 'test_append',  # incompatible with pytest capture
-        'test_mkdir_mode', 'test_env', 'test_local', 'test_iter_lines_error', 'test_atomic_file2', 'test_pid_file', 'test_atomic_counter', 'test_connection',  # sys.executable
-    ],
-    'flexmock': [
-        'test_flexmock_ordered_works_with_same_args',
-        'test_flexmock_ordered_works_with_same_args_after_default_stub',
-        'test_flexmock_preserves_stubbed_class_methods_between_tests',
-        'test_flexmock_preserves_stubbed_object_methods_between_tests',
-    ],  # concerning
-    'multipledispatch': ['test_benchmark', 'test_multipledispatch'],
-    'colorama': ['testInitDoesntWrapOnEmulatedWindows', 'testInitDoesntWrapOnNonWindows'],
-    'asn1crypto': ['test_load_order'],  # test requires asn1crypto.__file__ ; rather than allow for all tests, disable one test
-    'Jinja2': ['TestModuleLoader'],
-    'cryptography': [
-        'test_vector_version',  # ignore mismatch of cryptography master vs vectors released
-        'test_osrandom_engine_is_default',  # uses python -c
-        'TestAssertNoMemoryLeaks',  # test_openssl_memleak is skipped on openSUSE
-        'TestEd25519Certificate', 'TestSubjectKeyIdentifierExtension', 'test_load_pem_cert', # missing files in vectors
-        'test_aware_not_valid_after', 'test_aware_not_valid_before', 'test_aware_last_update', 'test_aware_next_update', 'test_aware_revocation_date',  #pytz problems
-    ],
-    'wrapt': ['test_before_and_after_import', 'test_before_import'],  # 'PyOxidizerFinder' object has no attribute 'load_module'
-    'psutil': [  # need to set env TRAVIS=1
-        'test_process', 'TestProcessUtils', 'TestScripts', 'TestTerminatedProcessLeaks', 'test_multi_sockets_proc', 'test_memory_leaks', # sys.executable
-        'test_warnings_on_misses', 'test_missing_sin_sout', 'test_no_vmstat_mocked',  # filename issues
-        'test_connections',  # all but one fail
-        'test_emulate_use_sysfs',  # vm problems
-        'test_power_plugged',
-        # setuptools.dist:585: in _parse_config_files: AttributeError: module 'distutils' has no attribute '__file__'
-    ],
-    'rdflib': ['test_module_names'],
-    'pygments': [
-		'test_cmdline',
-		'testCanRecognizeAndGuessExampleFiles', 'testApplicationCalendarXml', # fails because MarkupSafe distribution isnt provided by PyOxidizer
-		'testColonInComment',  # Yaml bug
-    ],
-    'SQLAlchemy': [
-        'aaa_profiling',  # unnecessary and slow
-        # should be QueryTest_sqlite+pysqlite_3_30_1.test_order_by_nulls :
-        'QueryTest_sqlite',  # AssertionError: Unexpected success for 'test_order_by_nulls' (not postgresql and not oracle and not firebird)
-        'test_column_property_select',  # sqlite3.OperationalError: misuse of aggregate: max()
-    ],
-    'regex': [
-        'test_main',
-        'test_hg_bugs',  # _pickle.PicklingError: Can't pickle <built-in function compile>: import of module '_regex' failed
-    ],
-    'requests': [
-        'test_errors', # 2/4 "test_errors" fail
-        'TestTimeout',
-        'test_proxy_error',
-        'test_https_warnings',  # this one is problematic
-    ],
-    'aiohttp': [
-        'test_aiohttp_request_coroutine', # [pyloop]
-        'test_aiohttp_request_ctx_manager_not_found',
-        'test_server_close_keepalive_connection', 'test_handle_keepalive_on_closed_connection',  # test_client_functional.py:2741:coroutine 'noop2' was never awaited
-        'test_connector', 'test_urldispatch',  # needs refining; also AttributeError: module 'aiohttp' has no attribute '__file__'
-        'test_aiohttp_plugin_async_gen_fixture',  # not important
-    ],
-    'pyOpenSSL': ['test_verify_with_time'],  # in TestX509StoreContext
-    'tornado': ['AutoreloadTest'],
-    'future': [
-        'test_requests',  # halts
-        'test_futurize',  # mostly failing, probably sys.executable
-        'test_mixed_annotations', 'test_multiple_param_annotations',  # sys.executable
-    ],
-    'Flask': [
-        'test_scriptinfo',  # fails if directory contains ':'
-        'test_main_module_paths',
-        'test_installed_module_paths', #[False]',
-        'test_installed_package_paths', #[False]',
-        'test_prefix_package_paths',  #[False]',
-        'test_egg_installed_paths',
-    ],
-    'python-whois': [
-        'test_ipv6',
-        'test_simple_ascii_domain',  # flaky
-        'test_il_parse',  # test_il_parse might be upstream error?
-    ],
-    'pycountry': [
-        'test_subdivisions_directly_accessible',  # 4844 vs 4836
-        'test_locales',  # fails in gettext
-    ],
-    # patched!
-    'toolz': ['test_tlz'],
-    'cytoolz': ['test_tlz'],
-    'lz4': ['test_roundtrip_1'],  # concerning - should be isolated with further at least test_roundtrip_1[data1-4-True-True-True-0-store_size0]
-    'lark': ['test_tools', 'TestStandalone', 'TestNearley'],
-}
 
 test_results = {}
-from pprint import pprint
 
-def run_tests(packages, skip={}, quit_early=False):
+
+def run_tests(packages, skip={}, quit_early=False, verbose=False):
+    cwd = os.getcwd()
+    sys_path = sys.path.copy()
     for package in packages:
-        print('looking at {}'.format(package))
+        if verbose:
+            print('looking at {}'.format(package))
         if package == ...:
-            test_results[package] = 'break!'
+            test_results[package] = 'break due to `...`!'
             break
-
-        mod_name, version = None, None
-        if isinstance(package, dict):
-            mod_name, package = next(iter(package.items()))
-        if isinstance(package, tuple):
-            package, version = package
-
-
-        if package in no_load_packages or package.lower() in no_load_packages:
-            test_results[package] = 'load avoided'
+        if isinstance(package, str) and len(package) > 50:
+            print('skipping long string')
             continue
 
-        if package in skip or package.lower() in skip:
+        if not isinstance(package, TestPackage):
+            package = TestPackage(package)
+
+        mod_name = package.mod_name 
+        excludes = package.test_ignores
+        version = package.version
+
+        pypi_name = package.pypi_name
+
+        if pypi_name in no_load_packages or pypi_name.lower() in no_load_packages:
+            test_results[pypi_name] = 'load avoided'
             continue
 
-        excludes = test_package_excludes.get(package)
-        try:
-            rv = run_pytest(package, mod_name, version, excludes=excludes)
-        except BaseException as e:
-            if quit_early:
-                raise
-            rv = e
+        if pypi_name in skip or pypi_name.lower() in skip:
+            continue
+
+        if excludes and excludes[0] == '*' and (not ignore_star_test_ignore or len(excludes) == 1):
+            print('Skipping {}'.format(package))
+            rv = 0
+        else:
+            try:
+                rv = run_pytest(package)
+            except BaseException as e:
+                if quit_early:
+                    raise
+                rv = e
+
+        os.chdir(cwd)
+        sys.path[:] = sys_path
+
         test_results[package] = rv
 
         if rv and quit_early:
@@ -992,124 +820,494 @@ def run_tests(packages, skip={}, quit_early=False):
 
         # Avoid clashes in test module names, like test_pickle in multidict and yarl
         # which causes pytest to fail
-        remove_test_modules()
+        remove_test_modules(verbose=verbose)
 
     pprint(test_results)
 
+
+# for Pyphen needs os.listdir hacked
+import pkg_resources
+def fake_resource_filename(package, name):
+    return '{}/{}/{}'.format(import_hooks._fake_root, package, name)
+
+pkg_resources.resource_filename = fake_resource_filename
+
+
 # Needed for test.support.__file__
-import os.path
-cpython_root = './build/target/x86_64-unknown-linux-gnu/debug/pyoxidizer/python.608871543e6d/python/install/lib/python3.7/'
-cpython_root = os.path.abspath(cpython_root)
+
 import_hooks.add_external_cpython_test_file_dunder(cpython_root, support_only=True)
-
-# This module is unusable unless another import hook is created
-import_hooks.add_external_file_dunder(cpython_root, ['lib2to3.pygram'])
-
-# black:
-import_hooks.add_relocated_external_file_dunder(cpython_root, 'blib2to3.pygram', 'b')
-
-import_hooks.add_file_dunder_during(cpython_root, 'test_future.test_imports_urllib', 'urllib')
-
-import_hooks.add_file_dunder_during(cpython_root, 'greenlet', 'distutils')
-
-import_hooks.add_file_dunder_during(cpython_root, 'hypothesis', 'os')
-
-#import_hooks.add_external_file_dunder( , 'tornado.testing')
 
 import_hooks.add_relocated_external_file_dunder(
     cpython_root, 'future.backports.urllib.request', 'future.backports')
 
-#import_hooks.add_relocated_external_file_dunder(
-#    cpython_root, "blist.test.test_support", "blist")
-#import blist.test.test_support
+# Needed by psutil test_setup_script
+import_hooks.add_file_dunder_during(cpython_root, 'setuptools', 'distutils')
 
-# not loading atm, so something is wrong
-#import _brotli
-import brotli._brotli
+packages = [
+    TestPackage('pycountry', [
+        'test_subdivisions_directly_accessible',  # 4844 vs 4836
+        'test_locales',  # fails in gettext
+    ], version='18.12.8'),  # exposes LOCALE_DIR, etc which will fail even if internal access is fixed
+    TestPackage('PyNaCl', [
+        'test_bindings.py', 'test_box.py',  # binary() got an unexpected keyword argument 'average_size'
+        'test_wrong_types',  # pytest5 incompatibility
+    ]),
+    TestPackage('bcrypt'),  # pep 517
 
-if run_all:
-    run_tests(skip_completed, skip={}, quit_early=quit_early)
-run_tests(packages, skip=skip_completed, quit_early=quit_early)
+    TestPackage('pyparsing'),
+    TestPackage('unicodedata2'),
 
-_pyox_packages = package_versions(_pyox_modules, standard_lib=False, std_lib_dir=cpython_root, not_imported=True)
-ignore = [i for i in skip_completed if isinstance(i, str)] + no_load_packages
+    TestPackage('decorator'),
+    TestPackage('ruamel.yaml', other_mods=['_ruamel_yaml']),  # upstream issue
 
-remainder = sorted([name for name, data in _pyox_packages.items() if name not in ignore and data.get('ver')])
+    TestPackage('psutil', [
+        '*',
+        'test_process', 'TestProcessUtils', 'TestScripts', 'TestTerminatedProcessLeaks', 'test_multi_sockets_proc', 'test_memory_leaks',  # sys.executable
+        'test_pid_exists', 'test_wait_procs', 'test_wait_procs_no_timeout', 'test_proc_environ',  # subprocess
+        'test_warnings_on_misses', 'test_missing_sin_sout', 'test_no_vmstat_mocked',  # filename issues
+        'TestFSAPIs',  # DSO loading
+        'test_connections',  # all but one fail
+        'test_emulate_use_sysfs', 'test_percent', 'test_cpu_affinity',  # vm problems
+        'test_power_plugged',
+        'test_cmdline', 'test_name',  # probable bug in how psutil calculates PYTHON_EXE
+        'test_sanity_version_check',  # need to disable psutil.tests.reload_module
+        'test_cmdline', 'test_pids', 'test_issue_687', # strange
+    ]),
+    TestPackage('cffi', [
+        '*',
+        'TestBitfield', 'test_verify', 'TestDistUtilsCPython',  # loads built extension dynamically
+        'TestZIntegration',  # popen
+        'cffi0/test_vgen.py', 'cffi0/test_vgen2.py',  # lots of error
+        'cffi1/test_parse_c_type.py',  # module 'cffi.cffi_opcode' has no attribute '__file__'
+        'test_commontypes', 'test_zdist',  # module 'cffi' has no attribute '__file__'
+        'TestNewFFI1',  # __file__
+        'test_recompiler', 'embedding',  # __file__
+        'cffi1/test_re_python.py',  # AttributeError: module 'distutils' has no attribute '__file__'
+    ], other_mods=['_cffi_backend']),
+    TestPackage('six', ['test_lazy']),  # assertion fails due to other packages; not worth isolating
+    TestPackage('brotlipy', mod_name='brotli', version='0.7.0', test_ignores=[
+        'test_streaming_compression', 'test_streaming_compression_flush',  # they take too long to complete
+        'test_compressed_data_with_dictionaries',  # removed functionality in brotli 1.x
+    ]),
+    TestPackage('urllib3', [
+        '*',
+        'contrib/', 'with_dummyserver/', 'test_connectionpool.py', # requires tornado
+        'test_cannot_import_ssl',  # probably oxidization makes test impossible
+        'test_render_part', 'test_parse_url', 'test_match_hostname_mismatch', 'test_url_vulnerabilities',
+    ]),
+    TestPackage('pyOpenSSL', [
+        'test_verify_with_time',  # in TestX509StoreContext
+        'memdbg.py',  # creates a DSO and fails when importing it
+        'test_debug.py',
+        'EqualityTestsMixin', 'util.py',  # pytest incompatible structure
+    ], mod_name='OpenSSL'),
+    TestPackage('pycparser', [
+        'test_c_generator.py', 'test_c_parser.py',  # inspect.getfile fails
+    ], other_mods=['utils']),
+    TestPackage('certifi', ['*']),  # has no tests
+    TestPackage('pip', ['*']),  # completely broken, starting with __file__
+    TestPackage('setuptools', ['*'], other_mods=['easy_install', 'pkg_resources']),  # mostly not useful within PyOxidizer, esp without pip, however pkg_resources is very important
+    TestPackage('cryptography', [
+        '*',
+        'test_vector_version',  # ignore mismatch of cryptography master vs vectors released
+        'test_osrandom_engine_is_default',  # uses python -c
+        'TestAssertNoMemoryLeaks',  # test_openssl_memleak is skipped on openSUSE
+        'TestEd25519Certificate', 'TestSubjectKeyIdentifierExtension', 'test_load_pem_cert', # missing files in vectors
+        'test_aware_not_valid_after', 'test_aware_not_valid_before', 'test_aware_last_update', 'test_aware_next_update', 'test_aware_revocation_date',  #pytz problems
+    ]),
+    TestPackage('requests', [
+        '*',
+        'test_errors', # 2/4 "test_errors" fail, which is problematic
+        'test_https_warnings',  # this one is problematic
+        'TestTimeout',
+        'test_proxy_error',
+        # https://github.com/psf/requests/pull/5251
+        'test_rewind_body_failed_tell', 'test_rewind_body_no_seek', 'test_conflicting_post_params', 'test_proxy_error'  # pytest compatibility
+    ]),
+    TestPackage('MarkupSafe'),
+    TestPackage('idna'),
+    TestPackage('chardet', ['*']),
 
-pprint(remainder)
+    TestPackage('PyYAML', mod_name='yaml', other_mods=['_yaml'], test_ignores=['*']),  # tests incompatible with pytest, and need test DSOs which cant be loaded
 
-if run_all:
-    run_tests(remainder, skip=skip_completed, quit_early=False)
+    TestPackage('tornado', test_ignores=['*', 'AutoreloadTest']),  # lots of failures
+    TestPackage('test-server', test_ignores=['*']),  # AttributeError: module 'tornado.web' has no attribute 'asynchronous'
+    TestPackage('PySocks', mod_name='socks', other_mods=['sockshandler'], test_ignores=['*']),  # requires test_server
 
-sys.exit(0)
+    # not listed
 
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-cmarkgfm/cmarkgfm-0.4.2/tests'])
-
-#os.environ['PYTEST_DISABLE_PLUGIN_AUTOLOAD'] = '1'
-
-import sys
-#sys.executable = None
-
-# all green
-
-#incompatible with pytest
-# runtests.py in project root
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-peewee/peewee-3.11.2/tests'])
-
-
-# depends on test.support
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-gevent/gevent-1.4.0/src/greentest/3.7'])
-
-# halts running subprocess during collection, twice and then dies without running tests
-# try running each separately to find the cause
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-gevent/gevent-1.4.0/src/gevent/tests/', '-k', 'not (test__subprocess or test__monkey_sigchld_3 or test__backdoor)'])
-
-# incompatible with pytest
-# needs to be run from in the project root
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-PyYAML/PyYAML-5.1.2/tests/lib3'])
-#import test_all
-#test_all.main()
-
-
-# one failure
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-lz4/lz4-2.1.10/tests'])
-
-# imports ok
-
-# cmarkgfm._cmark
-
-
-# zope.interface._zope_interface_coptimizations.cpython-37m-x86_64-linux-gnu.so ???
-
-# aiohttp._websocket
-
-# tests look related to paths
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-pygit2/pygit2-0.28.2/test'])
-
-# serious errors
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-pycares/pycares-3.0.0/tests/tests.py'])
+    TestPackage('importlib-metadata', ['test_zip']),
+    TestPackage('jsonschema', [
+        'test_cli.py',
+        'test_jsonschema_test_suite.py',  # requires data set
+        'test_validators.py',  # ImportError: cannot import name 'RefResolutionError' from 'jsonschema.validators'
+    ]),
+    TestPackage('logutils', ['test_hashandlers', 'RedisQueueTest']),  # unknown
+    TestPackage('botocore', [  # supposed to use nose test runner
+        'test_client_method_help', 'test_paginator_help_from_client', 'test_waiter_help_documentation',  # help() not included in PyOxidizer
+        'test_dynamic_client_error', 'test_s3_special_case_is_before_other_retry', 'test_s3_addressing', 'TestCreateClient', 'TestClientMonitoring', 'TestSessionPartitionFiles', 'TestGenerateDBAuthToken', 'test_internal_endpoint_resolver_is_same_as_deprecated_public', # botocore.session:160: in create_default_resolver botocore.loaders:132: in _wrapper  botocore.exceptions.DataNotFoundError: Unable to load data for: endpoints
+        'CloudFrontWaitersTest',  # botocore.exceptions.DataNotFoundError: Unable to load data for: cloudfront
+        'TestGenerateDocs', 'TestClientDocumenter', 'test_example', 'test_method', 'docs',  # botocore.exceptions.DataNotFoundError: Unable to load data for: _retry
+        'test_get_response_nonstreaming_ng', 'test_get_response_nonstreaming_ok', 'test_get_response_streaming_ng', 'test_get_response_streaming_ok', 'TestGenerateUrl',  'TestGeneratePresignedPost', # session.get_service_model('s3') botocore.exceptions.UnknownServiceError: Unknown service: 's3'. Valid service names are:
+    ]),
+    TestPackage('flexmock', [  # concerning, not investigated
+        'test_flexmock_ordered_works_with_same_args',
+        'test_flexmock_ordered_works_with_same_args_after_default_stub',
+        'test_flexmock_preserves_stubbed_class_methods_between_tests',
+        'test_flexmock_preserves_stubbed_object_methods_between_tests',
+        'test_flexmock_removes_new_stubs_from_classes_after_tests',
+    ]),
+    TestPackage('virtualenv', [
+        '*',  # ImportError: cannot import name '__file__' from 'virtualenv_support'
+        # also 'test_cmdline',
+    ], other_mods=['virtualenv_support']),
+    TestPackage('Werkzeug', [
+        'test_no_memory_leak_from_Rule_builder', 'test_find_modules',
+        'test_debug.py', 'test_serving.py',   # hang somewhere in here
+        'test_proxy_fix', 'test_http_proxy', 'test_append_slash_redirect',
+        'test_shared_data_middleware',
+    ]),
+    TestPackage('pyelftools', [
+        'run_examples_test.py',  # ImportError: cannot import name 'run_exe' from 'utils' (unknown location)
+        # probably need to de-import 'utils' loaded from another package test suite
+    ]),
 
 
-#pytest.main(['-v', '-pno:django', '-pno:flaky', '/home/jayvdb/projects/osc/d-l-py/python-sentry-sdk/sentry-python-0.13.1/tests'])
 
-# tests need to be built in
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-lxml/lxml-4.4.1/src/lxml/tests'])
+    # should be patched!?  but green with one exclusion
+    TestPackage('toolz', ['test_tlz'], other_mods=['tlz']),  # 'cytoolz',
+    TestPackage('cytoolz', ['test_tlz']),  # 'cytoolz',
 
-# doesnt work like this
-#pytest.main(['-v', 'chardet-c-detector.py', 'chardet-c-init-detect-close.py', 'chardet-compatible-basic.py', 'chardet-compatible-incrementally.py', 'chardet-compatible-multiple-files.py'])
+    # green
+    TestPackage('kitchen', [
+        'test_easy_gettext_setup_non_unicode', 'test_lgettext', 'test_lngettext', 'test_lgettext', 'test_lngettext', 'test_invalid_fallback_no_raise',  # not investigated
+    ]),
+    TestPackage('texttable', ['test_cli']),
 
-#pytest.main(['-v', '/home/jayvdb/projects/python/chardet/src/tests/test.py'])
+    TestPackage('simplejson', ['TestTool']),
+    TestPackage('msgpack'),
+    TestPackage('wheel', ['test_bdist_wheel', 'test_tagopt']),  # uses sys.executable),
+    TestPackage('aiodns', ['test_query_a_bad']),
+    TestPackage('dnspython'),
+    TestPackage('ptyprocess'),
+    TestPackage('rfc3986'),
+    TestPackage('vine', ['*']),  # fixture 'patching' not found
+    TestPackage('colorama', ['testInitDoesntWrapOnEmulatedWindows', 'testInitDoesntWrapOnNonWindows']),
+    TestPackage('Flask', [
+        'test_scriptinfo',  # fails if directory contains ':'
+        'test_main_module_paths',
+        'test_installed_module_paths', #[False]',
+        'test_installed_package_paths', #[False]',
+        'test_prefix_package_paths',  #[False]',
+        'test_egg_installed_paths',
+        'test_aborting',
+    ]),
+    TestPackage('Jinja2', ['TestModuleLoader']),
+    TestPackage('attrs', [
+        '*',
+        'test_multiple_empty',  # inspect.getsource failed
+    ], mod_name='attr'),
+    TestPackage('click-spinner'),
+    TestPackage('emoji'),
+    TestPackage('jsonpointer'),
+    TestPackage('xmltodict'),
+    TestPackage('jmespath'),
+    TestPackage('titlecase'),
+    TestPackage('tabulate', ['test_cli']),
+    TestPackage('wrapt', ['test_before_and_after_import', 'test_before_import']),  # 'PyOxidizerFinder' object has no attribute 'load_module',
+    TestPackage('multipledispatch', ['test_benchmark', 'test_multipledispatch']),
+    TestPackage('pyasn1'),
+    TestPackage('ordered-set'),
+    TestPackage('toml'),
+    TestPackage('orderedmultidict'),  # v1.0.1 needs __file__ to supply __version__
+    TestPackage('dparse', ['test_update_pipfile']),
+    TestPackage('cached-property', ['test_threads_ttl_expiry']),
+    TestPackage('pluggy'),
+    TestPackage('userpath', ['*']),  # requires pytest run inside tox
+    TestPackage('pyserial'),
+    TestPackage('pathspec'),
+    TestPackage('pyperclip', ['TestKlipper']),  # KDE service
+    TestPackage('rdflib', ['test_module_names']),  # master, unreleased
+    TestPackage('ConfigUpdater'),
+    TestPackage('itsdangerous'),
 
-# __file__
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-pycparser/pycparser-2.19/tests'])
-# Python.h
-#pytest.main(['-v', '-W', 'ignore::UserWarning', '/home/jayvdb/projects/osc/d-l-py/python-cffi/cffi-1.13.2/c', '/home/jayvdb/projects/osc/d-l-py/python-cffi/cffi-1.13.2/testing'])
+    # opensuse outdated
+    TestPackage('pyxattr'),
+    TestPackage('dulwich', [
+        '*',
+        'test_blackbox', 'GitReceivePackTests', 'test_missing_arg',  # subprocess
+    ]),
+    TestPackage('yarl'),
+    TestPackage('multidict'),
+    TestPackage('aiohttp', [
+        '*',
+        'test_aiohttp_request_coroutine', # [pyloop]
+        'test_aiohttp_request_ctx_manager_not_found',
+        'test_server_close_keepalive_connection', 'test_handle_keepalive_on_closed_connection',  # test_client_functional.py:2741:coroutine 'noop2' was never awaited
+        'test_connector', 'test_urldispatch',  # needs refining; also AttributeError: module 'aiohttp' has no attribute '__file__'
+        'test_aiohttp_plugin_async_gen_fixture', 'test_aiohttp_plugin_async_fixture',  # not important
+    ]),
+    TestPackage('future', [
+        '*',
+        'test_requests',  # halts
+        'test_futurize',  # mostly failing, probably sys.executable
+        'test_mixed_annotations', 'test_multiple_param_annotations',  # sys.executable
+        'test_bad_address',
+        'test_future/test_futurize.py', 'test_future/test_libfuturize_fixers.py', 'test_past/test_translation.py', 'test_correct_exit_status',  # lib2to3 disabled
+    ], other_mods=['past', 'libfuturize', 'libpasteurize']),  # opensuse outdated
+    #'six',  # opensuse outdated
+    TestPackage('semver'),  # opensuse outdated
+    TestPackage('shellingham'),
+    TestPackage('websockets'),  # opensuse outdated
+    TestPackage('asn1crypto', [
+        'test_load_order',  # test requires asn1crypto.__file__ ; rather than allow for all tests, disable one test,  # opensuse outdated
+        'test_extended_date_strftime', 'test_extended_datetime_strftime',  # tz bug
+    ]),
+    TestPackage('immutables'),  # outdated
+    TestPackage('python-stdnum'),  # outdated
+    TestPackage('zstd', ['test_version']),  # outdated
+    TestPackage('pytz'),  # opensuse outdated  pytz:95: in open_resource  NameError: name '__file__' is not defined
+    TestPackage('regex', [
+        'test_main',
+        'test_hg_bugs',  # _pickle.PicklingError: Can't pickle <built-in function compile>: import of module '_regex' failed
+    ]),  # opensuse outdated; depends on `test.support`
+    TestPackage('xxhash'),  # outdated
+    TestPackage('SQLAlchemy', [
+        '*',
+        'aaa_profiling',  # unnecessary and slow
+        # should be QueryTest_sqlite+pysqlite_3_30_1.test_order_by_nulls :
+        'QueryTest_sqlite',  # AssertionError: Unexpected success for 'test_order_by_nulls' (not postgresql and not oracle and not firebird)
+        'test_column_property_select',  # sqlite3.OperationalError: misuse of aggregate: max()
+        'ComponentReflectionTest_sqlite',  # ComponentReflectionTest_sqlite+pysqlite_3_30_1.test_deprecated_get_primary_keys
+        'test_deprecated_flags',  # AttributeError: 'object' object has no attribute '_sa_instance_state'
+    ]),  # outdated
+    TestPackage('graphviz'),  # outdated
+    TestPackage('python-slugify'),  # outdated
 
-# lots and lots of failures
-#pytest.main(['-v', '-pno:xdist', '/home/jayvdb/projects/osc/d-l-py/python-coverage/coverage-4.5.4/tests', '-k', 'not test_concurrency'])
+    # green; no version
+    TestPackage('repoze.lru', version='0.7'),
+    TestPackage('zope.interface', version='4.6.0'),
+    TestPackage('zope.event', version='4.4'),
+    TestPackage('zope.deprecation', version='4.4.0'),
+    TestPackage('persistent', version='4.5.0'),
+    TestPackage('zipp', version='0.6.0'),
+    TestPackage('wcwidth', version='0.1.7'),
+    TestPackage('isodate', version='0.6.0'),
+    TestPackage('lark-parser', [
+        '*',
+        'test_tools', 'TestStandalone', 'TestNearley',  # sys.executable / __file__
+    ], mod_name='lark', version='0.7.7'),
+    TestPackage('httmock', version='1.3.0'),
+    TestPackage('backports.test.support', [
+        'test_assert_python_failure', 'test_assert_python_ok_raises',  # cli
+    ], version='0.1.1'),
+    TestPackage('click-aliases', version='1.0.1'),
+    TestPackage('blindspin', version='2.0.1'),
+    TestPackage('class-proxy', version='1.1.0'),
+    # test collection needs help
+    TestPackage('pytimeparse'),  # passes if I do `ln -s testtimeparse.py test_timeparse.py`
+    TestPackage('cChardet'),  # opensuse no have  `mv test.py test_cChardet.py`
+    TestPackage('click'),  # ln -s Click-7.0 click-7.0
+    TestPackage('weakrefmethod'),  # ln -s test_weakmethod.py test_weakrefmethod.py
+    TestPackage('sortedcontainers'),  # ln -s python-sortedcontainers-2.1.0 sortedcontainers-2.1.0
+    TestPackage('billiard', ['integration']),
+    TestPackage('precis-i18n', [
+        'test_ietf_vectors.py',  # collection error
+        'test_derived_props_files',  # No such file or directory: '.../test/iana-precis-tables-6.3.0.csv'
+        'test_idempotent.py',  # hangs
+    ]),  # ln -s precis_i18n-1.0.0 precis-i18n-1.0.0
+    TestPackage('filelock'),  # ln -s py-filelock-3.0.12 filelock-3.0.12
+    TestPackage('typed-ast'),  # ln -s typed_ast-1.4.0 typed-ast-1.4.0
+    TestPackage('text-unidecode', version='1.3'),  # ln -s test_unidecode.py test_text_unidecode.py
 
-# rerun
+    # no tests
+    #TestPackage('certstream', ['*'], version='1.10'),  # https://github.com/CaliDog/certstream-python/issues/29
+    #TestPackage('click-completion', ['*']),  # outdated
+    #TestPackage('mulpyplexer', ['*'], version='0.08'),
+    #TestPackage('click-help-colors', ['*'], version='0.6'),  # has tests in master, but incompatible with 0.6
+    #TestPackage('hashID', ['*'], mod_name='hashid'),  # no tests, but broken https://github.com/psypanda/hashID/issues/47
+    #TestPackage('stdlib-list', ['*']),
+    #TestPackage('termcolor', ['*']),
 
-# needs to be runtests from project root
-#pytest.main(['-v', '/home/jayvdb/projects/osc/d-l-py/python-Cython/Cython-0.29.13/tests'])
+    # substantial failures; pytz
+    TestPackage('Pygments', [
+        'test_cmdline',
+        'testCanRecognizeAndGuessExampleFiles', 'testApplicationCalendarXml', # fails because MarkupSafe distribution isnt provided by PyOxidizer
+        'testColonInComment',  # one failure testColonInComment , yaml bug
+        'testEnhancedFor',  # java
+        'testBrokenUnquotedString',  # praat
+    ]),
+    TestPackage('lz4', [
+        '*',
+        'test_roundtrip_1',  # concerning - should be isolated with further at least test_roundtrip_1[data1-4-True-True-True-0-store_size0]),  # outdated
+    ]),
+    TestPackage('python-whois', [
+        'test_ipv4', 'test_ipv6',  # bugs
+        'test_simple_ascii_domain',  # flaky
+        'test_il_parse',  # test_il_parse might be upstream error?
+    ], version='0.7.2'),  # outdated __file__ ; very weird use of os.getcwd()
+    TestPackage('networkx'),  # outdated ; hack needs polishing
+    TestPackage('python-dateutil', [
+        'testAmbiguousNegativeUTCOffset', 'testAmbiguousPositiveUTCOffset', 'ZoneInfoGettzTest',  # tz problems
+        'testPickleZoneFileGettz', 'testPickleZoneFileGettz',
+        'test_parse_unambiguous_nonexistent_local', 'test_tzlocal_parse_fold',
+        'TzLocalNixTest',
+        'test_tzlocal_utc_equal', 'test_tzlocal_offset_equal',
+    ]),  # outdated , serious tz issues
+    TestPackage('plumbum', [
+        'test_sudo', 'test_remote', 'test_copy_move_delete',
+        'test_slow', 'test_append',  # incompatible with pytest capture
+        'test_mkdir_mode', 'test_env', 'test_local', 'test_iter_lines_error', 'test_atomic_file2', 'test_pid_file', 'test_atomic_counter', 'test_connection',  # sys.executable
+        'test_home', 'test_nohup',
+    ]),
+    TestPackage('pyrsistent', other_mods=['_pyrsistent_version', 'pvectorc'], version='0.15.4'),  # TODO: get version?
 
+    # late additions
+    TestPackage('soupsieve', ['*']),  # File "soupsieve.util", line 9, in <module>: NameError: name '__file__' is not defined
+    TestPackage('waitress', [
+        'test_functional.py',  # hangs
+        'TestAPI_UseIPv4Sockets', 'TestAPI_UseIPv6Sockets',
+        'TestAPI_UseUnixSockets',
+    ], version='1.3.1'),
+    TestPackage('WebOb', version='1.8.5'),
+    TestPackage('websocket-client', mod_name='websocket'),
+    TestPackage('WebTest', ['*'], mod_name='webtest'),  # __file__
+    TestPackage('xmlschema', ['*']),  # __file__
+    TestPackage('yaspin', ['*']),  # __file__
+    TestPackage('netaddr', ['*']),  # __file__
+    TestPackage('more-itertools', ['SetPartitionsTests'], version='7.2.0'),
+    TestPackage('packaging', [
+        '*',
+        'test_invalid_url', 'test_parseexception_error_msg',  # pytest5 incompatibility
+        'test_cpython_abi_py3', 'test_cpython_abi_py2', 'test_cpython_tags', 'test_sys_tags_on_mac_cpython', 'test_sys_tags_on_windows_cpython', 'test_sys_tags_linux_cpython',  # AttributeError: module 'packaging.tags' has no attribute '_cpython_abi'
+    ]),
+    TestPackage('stdio-mgr', [
+        'test_catch_warnings', 'test_capture_stderr_warn',  # pytest arg incompat
+    ]),
+    TestPackage('async-timeout'),  # ln -s python-async_timeout python-async-timeout
+
+    TestPackage('bottle', ['*']),  # NameError("name '__file__' is not defined")}
+    TestPackage('distro', [
+        'TestCli',
+        'TestLSBRelease',
+        'TestSpecialRelease',
+        'TestOverall',
+        'TestGetAttr',
+        'TestInfo',
+    ]),  #  ln -s distro-1.4.0 distro-20190617
+    TestPackage('docutils', ['*']),  # test collection problem
+    TestPackage('elementpath', [
+        'test_schema_proxy.py',  # xmlschema.codepoints:562: in build_unicode_categories: NameError: name '__file__' is not defined
+    ]),
+    TestPackage('pycares', [
+        'test_custom_resolvconf', 'test_getnameinfo', 'test_idna_encoding',  # not investigated
+        'test_idna_encoding_query_a', 'test_query_a_bad', 'test_query_timeout',
+        'test_query_txt_multiple_chunked', 'test_result_not_ascii',
+        'test_query_any', 'test_query_mx', 'test_query_ns',
+    ]),
+    TestPackage('beautifulsoup4', ['*'], mod_name='bs4'),  # NameError("name '__file__' is not defined")}
+    TestPackage('cmd2', ['*']),  # AttributeError("module 'docutils.parsers.rst.states' has no attribute '__file__'")}
+    TestPackage('click-didyoumean', ['*']),  # all broken, not investigated
+
+]
+
+# psutil expects TRAVIS to signal deactivating unstable tests
+os.environ['TRAVIS'] = '1'
+
+package_names = []
+for package in packages:
+    if isinstance(package, TestPackage):
+       package_names.append(package.pypi_name)
+
+namespace_packages = {package.pypi_name.split('.')[0] for package in packages if '.' in package.pypi_name}
+
+#print(namespace_packages)
+
+# Create requirements file
+#package_names = sorted(package_names)
+#for name in package_names:
+#    print(str(name))
+#sys.exit(1)
+
+run_tests(packages, quit_early=quit_early)
+
+"""
+for package in packages:
+    mod = None
+    if not package._mod_is_default:
+        mod_name = package.mod_name
+    else:
+        mod_name = package.pypi_name
+    try:
+        mod = aggressive_import(mod_name)
+    except Exception as e:
+        print("aggressive_import {} failed: {!r}".format(package.pypi_name, e))
+        test_results[package] = 1
+        continue
+    if package._mod_is_default:
+        print("updating {} mod_name to {}".format(package.pypi_name, mod.__name__))
+        package.mod_name = mod.__name__
+    test_results[package] = 0
+"""
+
+
+_pyox_packages = package_versions(_pyox_modules, standard_lib=False, namespace_packages=namespace_packages)
+
+assert 'repoze.lru' in _pyox_packages
+
+assert 'test' not in _pyox_packages
+import backports.test.support
+sys.modules['test'] = backports.test
+sys.modules['test.support'] = backports.test.support
+
+print('_pyox_packages:')
+pprint(_pyox_packages)
+
+untested = []
+
+for mod, info in _pyox_packages.items():
+    for package in packages:
+        if mod in package:
+            # print('found {!r} in {!r}'.format(mod, package))
+            if package not in test_results:
+                if info.get('err'):
+                    print(f'listed {mod} wasnt imported: {info["err"]}')
+                elif not info.get('ver'):
+                    print(f'listed & unversioned package {mod} wasnt tested:\n  {info}')
+                else:
+                    print(f'listed package {mod} wasnt tested:\n  {info}')
+                untested.append(package)
+            break
+    else:
+        if not info.get('ver'):
+            print(f'unlisted & unversioned package {mod} wasnt tested:\n  {info}')
+        else:
+            print(f'unlisted package {mod} wasnt tested:\n  {info}')
+        untested.append(TestPackage(mod))
+
+for mod in sorted(_pyox_modules):
+    if _is_std_lib(mod, cpython_root):
+        continue
+    for package in packages:
+        if mod in package:
+            break
+    else:
+        for package in untested:
+            if mod in package:
+                break
+        else:
+            untested.append(TestPackage(mod))
+
+for package in untested:
+    print(f'{package} not known')
+if not untested:
+    print('All packages tested')
+
+test_dependencies = package_versions(standard_lib=False,
+                                     namespace_packages=namespace_packages,
+                                     exclude=_pyox_modules)
+
+print('Test dependencies:')
+pprint(test_dependencies)
+
+sys.exit(not untested)

@@ -1,0 +1,30 @@
+git+https://github.com/micheles/decorator
+git+https://github.com/pavdmyt/yaspin
+git+https://github.com/mrocklin/multipledispatch
+
+orderedmultidict<1.0.1
+git+https://github.com/jayvdb/brotlipy@libbrotli-v1.0-support#egg=brotlipy
+
+requests[security,socks]
+
+# workaround lack of pep 517 support
+#git+https://github.com/jayvdb/cryptography#egg=cryptography
+#cryptography
+#git+https://github.com/jayvdb/bcrypt@no-pyproject#egg=bcrypt
+bcrypt
+#git+https://github.com/jayvdb/pynacl@no-pyproject#egg=PyNaCl
+PyNaCl
+unicodedata2
+jsonschema==3.0.2 # breaks httpbin
+git+https://github.com/RDFLib/rdflib
+git+https://github.com/jayvdb/cmd2@staticlib#egg=cmd2
+
+elementpath
+git+https://github.com/jayvdb/xmlschema@setup-requires#egg=xmlschema
+
+git+https://github.com/chardet/chardet
+
+simplejson
+
+# non-binary
+git+https://github.com/bskinn/stdio-mgr
