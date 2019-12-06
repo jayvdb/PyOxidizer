@@ -1,6 +1,6 @@
 run_all = False
 quit_early = False
-ignore_star_test_ignore = True  #False
+ignore_star_test_ignore = False
 
 from pprint import pprint
 import importlib
@@ -39,6 +39,7 @@ base_pytest_args = [
     '-pno:relaxed',
     '-pno:flaky',
     '-pno:doctestplus',  # breaks jsonpointer tests
+    '-pno:profiling',  # broken regex SyntaxError('invalid escape sequence..')
 
     # useful to check clashes of test packages with real packages
     #'--import-mode=append',
@@ -196,9 +197,9 @@ import_hooks.add_after_import_hook(
 )
 
 import_hooks.add_empty_load(no_load_packages)
-f= import_hooks.add_empty_load(['networkx.algorithms.tree.recognition'])
+h = import_hooks.add_empty_load(['networkx.algorithms.tree.recognition'])
 import networkx
-import_hooks.unregister_import_hook(f)
+import_hooks.unregister_import_hook(h)
 
 import sys
 del sys.modules['networkx.algorithms.tree.recognition']
@@ -517,7 +518,7 @@ def package_versions(modules=None, builtins=None, namespace_packages=None,
     if builtins is False:
         root_packages = set(root_packages - builtin_packages)
     if exclude_main:
-        root_packages -= {'__main__'}
+        root_packages -= {'__main__', '__mp_main__'}
 
     if verbose:
         print('root packages:', sorted(root_packages))
@@ -577,7 +578,8 @@ def package_versions(modules=None, builtins=None, namespace_packages=None,
                 path = path.decode(sys.getfilesystemencoding())
 
             info['path'] = path
-            assert path not in paths, 'Path {} of the package {} is in defined paths {}'.format(path, package, paths)
+            if path in paths:
+                print('Path {} of the package {} is already in defined paths assosciated with {}'.format(path, package, paths[path]))
             paths[path] = name
         else:
             if _is_std_lib(name, std_lib_dir):
@@ -720,7 +722,7 @@ def run_pytest(package, test_path=None, add_test_file_dunder=False, verbose=Fals
         hooks.append(import_hooks.add_external_file_dunder(package_base, ['tornado.testing']))
 
     pytest_args = base_pytest_args.copy()
-    if mod_name == 'billiard':
+    if test_path == 't/' or mod_name in ['billiard', 'vine']:
         pytest_args.remove('-c/dev/null')
 
     if mod_name == 'ruamel.yaml':
@@ -753,10 +755,17 @@ def run_pytest(package, test_path=None, add_test_file_dunder=False, verbose=Fals
 
 def remove_test_modules(verbose=False):
     for name in sorted(sys.modules.keys()):
-        if name.startswith('test_') or name.endswith('_test') or name.startswith('test.') or name.startswith('tests.') or name in ['linecache', 'test', 'tests', 'conftest'] or name.startswith('pytest') or name.startswith('_pytest') or name == 'py' or name.startswith('py.'):
+        # utils is owned by pycparser
+        if name.startswith('test_') or name.endswith('_test') or name.startswith('test.') or name.startswith('t.') or name.startswith('tests.') or name in ['t', 'utils', 'linecache', 'test', 'tests', 'conftest'] or name.startswith('pytest') or name.startswith('_pytest') or name == 'py' or name.startswith('py.'):
            if verbose:
                print('removing imported {}'.format(name))
            del sys.modules[name]
+
+    #backports.test.__file__
+    #sys.modules['test'] = backports.test
+    #sys.modules['test.support'] = backports.test.support
+    # vine fails without this>?
+    import case.pytest
 
     #assert 'tests' not in sys.modules
     #print(sorted(sys.modules))
@@ -813,8 +822,8 @@ def run_tests(packages, skip={}, quit_early=False, verbose=False):
 
         test_results[package] = rv
 
-        if rv and quit_early:
-            if isinstance(rv, Exception):
+        if rv and quit_early or isinstance(rv, KeyboardInterrupt):
+            if isinstance(rv, BaseException):
                 raise rv
             sys.exit(rv)
 
@@ -840,24 +849,54 @@ import_hooks.add_external_cpython_test_file_dunder(cpython_root, support_only=Tr
 import_hooks.add_relocated_external_file_dunder(
     cpython_root, 'future.backports.urllib.request', 'future.backports')
 
+
 # Needed by psutil test_setup_script
 import_hooks.add_file_dunder_during(cpython_root, 'setuptools', 'distutils')
 
+# needs test.support
+regex_package = TestPackage('regex', [
+    'test_main',
+    'test_hg_bugs',  # _pickle.PicklingError: Can't pickle <built-in function compile>: import of module '_regex' failed
+])  # opensuse outdated
+
+
 packages = [
+    TestPackage('weakrefmethod'),  # ln -s test_weakmethod.py test_weakrefmethod.py
+    TestPackage('pyasn1'),
+    TestPackage('filelock'),  # ln -s py-filelock-3.0.12 filelock-3.0.12
+    TestPackage('cached-property', ['test_threads_ttl_expiry']),
+    # test suites break: async Event loop closed?
+    TestPackage('async-timeout'),  # ln -s python-async_timeout python-async-timeout
+
+    TestPackage('tornado', test_ignores=[
+        '*',
+        'TestIOStreamWebMixin', 'TestReadWriteMixin', 'TestIOStreamMixin',
+        'AutoreloadTest', 'GenCoroutineTest', 'HTTPServerRawTest', 'UnixSocketTest', 'BodyLimitsTest', 'TestIOLoopConfiguration', 'TestIOStream', 'TestIOStreamSSL', 'TestIOStreamSSLContext', 'TestPipeIOStream',
+        'LoggingOptionTest',
+        'SubprocessTest',
+        'simple_httpclient_test',  # a few failures
+        'test_error_line_number_extends_sub_error',
+    ]),  # lots of failures
+    TestPackage('vine'),
     TestPackage('pycountry', [
         'test_subdivisions_directly_accessible',  # 4844 vs 4836
         'test_locales',  # fails in gettext
     ], version='18.12.8'),  # exposes LOCALE_DIR, etc which will fail even if internal access is fixed
     TestPackage('PyNaCl', [
+        '*',
         'test_bindings.py', 'test_box.py',  # binary() got an unexpected keyword argument 'average_size'
         'test_wrong_types',  # pytest5 incompatibility
-    ]),
-    TestPackage('bcrypt'),  # pep 517
+    ], other_mods=['_sodium']),
+
+    #...,
+
+    TestPackage('bcrypt', other_mods=['_bcrypt']),  # pep 517
 
     TestPackage('pyparsing'),
     TestPackage('unicodedata2'),
 
     TestPackage('decorator'),
+    TestPackage('ruamel.std.pathlib', ['*']),  # no tests?
     TestPackage('ruamel.yaml', other_mods=['_ruamel_yaml']),  # upstream issue
 
     TestPackage('psutil', [
@@ -872,6 +911,7 @@ packages = [
         'test_cmdline', 'test_name',  # probable bug in how psutil calculates PYTHON_EXE
         'test_sanity_version_check',  # need to disable psutil.tests.reload_module
         'test_cmdline', 'test_pids', 'test_issue_687', # strange
+        'test_unix_socketpair',
     ]),
     TestPackage('cffi', [
         '*',
@@ -930,11 +970,11 @@ packages = [
 
     TestPackage('PyYAML', mod_name='yaml', other_mods=['_yaml'], test_ignores=['*']),  # tests incompatible with pytest, and need test DSOs which cant be loaded
 
-    TestPackage('tornado', test_ignores=['*', 'AutoreloadTest']),  # lots of failures
     TestPackage('test-server', test_ignores=['*']),  # AttributeError: module 'tornado.web' has no attribute 'asynchronous'
     TestPackage('PySocks', mod_name='socks', other_mods=['sockshandler'], test_ignores=['*']),  # requires test_server
 
     # not listed
+    TestPackage('Jinja2', ['TestModuleLoader']),
 
     TestPackage('importlib-metadata', ['test_zip']),
     TestPackage('jsonschema', [
@@ -991,7 +1031,6 @@ packages = [
     TestPackage('dnspython'),
     TestPackage('ptyprocess'),
     TestPackage('rfc3986'),
-    TestPackage('vine', ['*']),  # fixture 'patching' not found
     TestPackage('colorama', ['testInitDoesntWrapOnEmulatedWindows', 'testInitDoesntWrapOnNonWindows']),
     TestPackage('Flask', [
         'test_scriptinfo',  # fails if directory contains ':'
@@ -1002,7 +1041,6 @@ packages = [
         'test_egg_installed_paths',
         'test_aborting',
     ]),
-    TestPackage('Jinja2', ['TestModuleLoader']),
     TestPackage('attrs', [
         '*',
         'test_multiple_empty',  # inspect.getsource failed
@@ -1016,19 +1054,17 @@ packages = [
     TestPackage('tabulate', ['test_cli']),
     TestPackage('wrapt', ['test_before_and_after_import', 'test_before_import']),  # 'PyOxidizerFinder' object has no attribute 'load_module',
     TestPackage('multipledispatch', ['test_benchmark', 'test_multipledispatch']),
-    TestPackage('pyasn1'),
     TestPackage('ordered-set'),
     TestPackage('toml'),
     TestPackage('orderedmultidict'),  # v1.0.1 needs __file__ to supply __version__
     TestPackage('dparse', ['test_update_pipfile']),
-    TestPackage('cached-property', ['test_threads_ttl_expiry']),
     TestPackage('pluggy'),
     TestPackage('userpath', ['*']),  # requires pytest run inside tox
     TestPackage('pyserial'),
     TestPackage('pathspec'),
     TestPackage('pyperclip', ['TestKlipper']),  # KDE service
     TestPackage('rdflib', ['test_module_names']),  # master, unreleased
-    TestPackage('ConfigUpdater'),
+    TestPackage('ConfigUpdater', version='1.0.1'),
     TestPackage('itsdangerous'),
 
     # opensuse outdated
@@ -1042,6 +1078,9 @@ packages = [
     TestPackage('aiohttp', [
         '*',
         'test_aiohttp_request_coroutine', # [pyloop]
+        'test_client_fingerprint.py',  # ssl = pytest.importorskip('ssl'): KeyError: 'ssl'
+        'test_warning_checks',  # ValueError: Pytest terminal summary report not found
+        'test_testcase_no_app',  # fails if pytest plugin cacheprovider is disabled
         'test_aiohttp_request_ctx_manager_not_found',
         'test_server_close_keepalive_connection', 'test_handle_keepalive_on_closed_connection',  # test_client_functional.py:2741:coroutine 'noop2' was never awaited
         'test_connector', 'test_urldispatch',  # needs refining; also AttributeError: module 'aiohttp' has no attribute '__file__'
@@ -1067,10 +1106,6 @@ packages = [
     TestPackage('python-stdnum'),  # outdated
     TestPackage('zstd', ['test_version']),  # outdated
     TestPackage('pytz'),  # opensuse outdated  pytz:95: in open_resource  NameError: name '__file__' is not defined
-    TestPackage('regex', [
-        'test_main',
-        'test_hg_bugs',  # _pickle.PicklingError: Can't pickle <built-in function compile>: import of module '_regex' failed
-    ]),  # opensuse outdated; depends on `test.support`
     TestPackage('xxhash'),  # outdated
     TestPackage('SQLAlchemy', [
         '*',
@@ -1108,7 +1143,6 @@ packages = [
     TestPackage('pytimeparse'),  # passes if I do `ln -s testtimeparse.py test_timeparse.py`
     TestPackage('cChardet'),  # opensuse no have  `mv test.py test_cChardet.py`
     TestPackage('click'),  # ln -s Click-7.0 click-7.0
-    TestPackage('weakrefmethod'),  # ln -s test_weakmethod.py test_weakrefmethod.py
     TestPackage('sortedcontainers'),  # ln -s python-sortedcontainers-2.1.0 sortedcontainers-2.1.0
     TestPackage('billiard', ['integration']),
     TestPackage('precis-i18n', [
@@ -1116,7 +1150,6 @@ packages = [
         'test_derived_props_files',  # No such file or directory: '.../test/iana-precis-tables-6.3.0.csv'
         'test_idempotent.py',  # hangs
     ]),  # ln -s precis_i18n-1.0.0 precis-i18n-1.0.0
-    TestPackage('filelock'),  # ln -s py-filelock-3.0.12 filelock-3.0.12
     TestPackage('typed-ast'),  # ln -s typed_ast-1.4.0 typed-ast-1.4.0
     TestPackage('text-unidecode', version='1.3'),  # ln -s test_unidecode.py test_text_unidecode.py
 
@@ -1184,7 +1217,6 @@ packages = [
     TestPackage('stdio-mgr', [
         'test_catch_warnings', 'test_capture_stderr_warn',  # pytest arg incompat
     ]),
-    TestPackage('async-timeout'),  # ln -s python-async_timeout python-async-timeout
 
     TestPackage('bottle', ['*']),  # NameError("name '__file__' is not defined")}
     TestPackage('distro', [
@@ -1204,7 +1236,7 @@ packages = [
         'test_idna_encoding_query_a', 'test_query_a_bad', 'test_query_timeout',
         'test_query_txt_multiple_chunked', 'test_result_not_ascii',
         'test_query_any', 'test_query_mx', 'test_query_ns',
-    ]),
+    ], other_mods=['_cares']),
     TestPackage('beautifulsoup4', ['*'], mod_name='bs4'),  # NameError("name '__file__' is not defined")}
     TestPackage('cmd2', ['*']),  # AttributeError("module 'docutils.parsers.rst.states' has no attribute '__file__'")}
     TestPackage('click-didyoumean', ['*']),  # all broken, not investigated
@@ -1219,7 +1251,7 @@ for package in packages:
     if isinstance(package, TestPackage):
        package_names.append(package.pypi_name)
 
-namespace_packages = {package.pypi_name.split('.')[0] for package in packages if '.' in package.pypi_name}
+namespace_packages = {package.pypi_name.split('.')[0] for package in packages if isinstance(package, TestPackage) and '.' in package.pypi_name}
 
 #print(namespace_packages)
 
@@ -1229,7 +1261,28 @@ namespace_packages = {package.pypi_name.split('.')[0] for package in packages if
 #    print(str(name))
 #sys.exit(1)
 
+#import case.pytest
+
+# conflicks wiht './test.py'
+
+h = import_hooks.add_relocated_external_file_dunder(
+    cpython_root, 'backports.test', 'backports')
+
+import backports.test.support
+backports.test.__file__
+sys.modules['test'] = backports.test
+sys.modules['test.support'] = backports.test.support
+
+# TODO: add a hook system to setup test.support only
+# for specific packages
+run_tests([regex_package], quit_early=quit_early)
+
+import_hooks.unregister_import_hook(h)
+
+
 run_tests(packages, quit_early=quit_early)
+
+packages.append(regex_package)
 
 """
 for package in packages:
@@ -1255,10 +1308,6 @@ _pyox_packages = package_versions(_pyox_modules, standard_lib=False, namespace_p
 
 assert 'repoze.lru' in _pyox_packages
 
-assert 'test' not in _pyox_packages
-import backports.test.support
-sys.modules['test'] = backports.test
-sys.modules['test.support'] = backports.test.support
 
 print('_pyox_packages:')
 pprint(_pyox_packages)
