@@ -111,6 +111,7 @@ virtualenv
 wcwidth
 weakrefmethod
 websockets
+websocket-client
 wheel
 wrapt
 xmltodict

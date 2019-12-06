@@ -223,8 +223,6 @@ import_hooks.overload_open(['pycountry', 'pycountry.db', 'stdlib_list.base'])
 #pytest.main(['-v', '-pno:django', '/home/jayvdb/projects/osc/d-l-py/python-mock/mock-2.0.0/mock/tests/__main__.py'])
 
 
-#import_hooks.overload_open(['lark.load_grammar', 'lark.tools.standalone'], is_module=True)
-
 # needs to be before! during exec
 #import_hooks.overload_open(['netaddr.eui.ieee', 'netaddr.ip.iana'], is_module=True)
 
@@ -756,7 +754,8 @@ def run_pytest(package, test_path=None, add_test_file_dunder=False, verbose=Fals
 def remove_test_modules(verbose=False):
     for name in sorted(sys.modules.keys()):
         # utils is owned by pycparser
-        if name.startswith('test_') or name.endswith('_test') or name.startswith('test.') or name.startswith('t.') or name.startswith('tests.') or name in ['t', 'utils', 'linecache', 'test', 'tests', 'conftest'] or name.startswith('pytest') or name.startswith('_pytest') or name == 'py' or name.startswith('py.'):
+        # case.pytest needs evicting otherwise vine fails
+        if name.startswith('test_') or name.endswith('_test') or name.startswith('test.') or name.startswith('t.') or name.startswith('tests.') or name in ['t', 'utils', 'linecache', 'test', 'tests', 'conftest', 'case.pytest'] or name.startswith('pytest') or name.startswith('_pytest') or name == 'py' or name.startswith('py.'):
            if verbose:
                print('removing imported {}'.format(name))
            del sys.modules[name]
@@ -765,7 +764,7 @@ def remove_test_modules(verbose=False):
     #sys.modules['test'] = backports.test
     #sys.modules['test.support'] = backports.test.support
     # vine fails without this>?
-    import case.pytest
+    #import case.pytest
 
     #assert 'tests' not in sys.modules
     #print(sorted(sys.modules))
@@ -861,12 +860,20 @@ regex_package = TestPackage('regex', [
 
 
 packages = [
+    TestPackage('pycountry', [
+        'test_subdivisions_directly_accessible',  # 4844 vs 4836
+        'test_locales',  # fails in gettext
+    ], version='18.12.8'),  # exposes LOCALE_DIR, etc which will fail even if internal access is fixed
+    TestPackage('vine'),
+    # test suites break: async Event loop closed?
+    TestPackage('decorator'),
     TestPackage('weakrefmethod'),  # ln -s test_weakmethod.py test_weakrefmethod.py
     TestPackage('pyasn1'),
     TestPackage('filelock'),  # ln -s py-filelock-3.0.12 filelock-3.0.12
     TestPackage('cached-property', ['test_threads_ttl_expiry']),
-    # test suites break: async Event loop closed?
+    TestPackage('Jinja2', ['TestModuleLoader']),
     TestPackage('async-timeout'),  # ln -s python-async_timeout python-async-timeout
+    #...,
 
     TestPackage('tornado', test_ignores=[
         '*',
@@ -877,11 +884,6 @@ packages = [
         'simple_httpclient_test',  # a few failures
         'test_error_line_number_extends_sub_error',
     ]),  # lots of failures
-    TestPackage('vine'),
-    TestPackage('pycountry', [
-        'test_subdivisions_directly_accessible',  # 4844 vs 4836
-        'test_locales',  # fails in gettext
-    ], version='18.12.8'),  # exposes LOCALE_DIR, etc which will fail even if internal access is fixed
     TestPackage('PyNaCl', [
         '*',
         'test_bindings.py', 'test_box.py',  # binary() got an unexpected keyword argument 'average_size'
@@ -895,7 +897,6 @@ packages = [
     TestPackage('pyparsing'),
     TestPackage('unicodedata2'),
 
-    TestPackage('decorator'),
     TestPackage('ruamel.std.pathlib', ['*']),  # no tests?
     TestPackage('ruamel.yaml', other_mods=['_ruamel_yaml']),  # upstream issue
 
@@ -974,13 +975,13 @@ packages = [
     TestPackage('PySocks', mod_name='socks', other_mods=['sockshandler'], test_ignores=['*']),  # requires test_server
 
     # not listed
-    TestPackage('Jinja2', ['TestModuleLoader']),
 
     TestPackage('importlib-metadata', ['test_zip']),
     TestPackage('jsonschema', [
         'test_cli.py',
         'test_jsonschema_test_suite.py',  # requires data set
         'test_validators.py',  # ImportError: cannot import name 'RefResolutionError' from 'jsonschema.validators'
+        'test_repr',
     ]),
     TestPackage('logutils', ['test_hashandlers', 'RedisQueueTest']),  # unknown
     TestPackage('botocore', [  # supposed to use nose test runner
@@ -1261,7 +1262,6 @@ namespace_packages = {package.pypi_name.split('.')[0] for package in packages if
 #    print(str(name))
 #sys.exit(1)
 
-#import case.pytest
 
 # conflicks wiht './test.py'
 
@@ -1275,11 +1275,16 @@ sys.modules['test.support'] = backports.test.support
 
 # TODO: add a hook system to setup test.support only
 # for specific packages
+#sys_modules_pre = set(sys.modules.copy())
 run_tests([regex_package], quit_early=quit_early)
+
+# todo evict all new modules after each job
+#sys_modules_post = set(sys.modules.copy())
+#print('new mods', sorted(sys_modules_post - sys_modules_pre))
 
 import_hooks.unregister_import_hook(h)
 
-
+remove_test_modules()
 run_tests(packages, quit_early=quit_early)
 
 packages.append(regex_package)
