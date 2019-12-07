@@ -99,6 +99,12 @@ packaging_rules.append(
 # Override old pytest incompatible chardet with upcoming chardet
 packaging_rules.append(PipInstallSimple("git+https://github.com/chardet/chardet"))
 
+
+# Override 1.1.0 which is incompatible with PyOxidizer
+#   File "importlib_metadata._compat", line 76, in matches
+# AttributeError: 'PyOxidizerFinder' object has no attribute '__module__'
+packaging_rules.append(PipInstallSimple("importlib-metadata==0.17"))
+
 # Package .py files discovered in a local directory.
 #packaging_rules.append(PackageRoot(
 #    path="/home/jayvdb/projects/osc/devel:languages:python/python-mock/mock-3.0.5", packages=["mock.tests"], excludes=["mock.tests.__init__"],

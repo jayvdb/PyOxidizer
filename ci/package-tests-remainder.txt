@@ -42,10 +42,6 @@ graphviz
 httmock
 idna
 immutables
-importlib-metadata==0.17
-# ^ 1.1.0  pluggy to load it, and fails with 
-#   File "importlib_metadata._compat", line 76, in matches 
-# AttributeError: 'PyOxidizerFinder' object has no attribute '__module__'
 isodate
 itsdangerous
 jmespath
