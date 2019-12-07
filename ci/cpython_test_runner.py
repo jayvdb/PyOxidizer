@@ -22,8 +22,6 @@ skip_test_modules = set([
     "test.test_multiprocessing_forkserver",
     "test.test_multiprocessing_spawn",
 
-    #"test_importlib",
-
     "test.test_datetime",  # crashs due to missing _testcapi
     "test.test_code",  # missing _PyEval_RequestCodeExtraIndex
     "test.test_ctypes",  # attempts loading external file _ctypes_test
@@ -55,9 +53,7 @@ sys._home = dist_root
 sys.base_exec_prefix = sys.exec_prefix = sys.base_prefix = sys.prefix = dist_root
 
 
-
 external_file_dunder.add_external_cpython_test_file_dunder(cpython_root)
-
 
 # This is the equivalent of inspect.findsource(inspect).
 # When if fails, assume stdlib was built without source included
@@ -104,72 +100,47 @@ print('during hooks added')
 
 from unittest import skip, SkipTest
 
-def get_test_module(name):
-    if name.startswith('distutils.tests') or name.startswith('unittest.test.') or '.data.' in name or name.startswith('lib2to3.tests.') or name.startswith('test.test_importlib.') or name in ['test.test_json.test_tool']:
-        return name
-    elif name.startswith('test.'):
-        return name[5:].split('.', 1)[0]
-
-func_delete = {
-    # sys.executable
-    'test_doctest': ['test_CLI', 'test_unicode'],
-    # substantial problems
-    'test_pdb': ['test_list_commands'],
-    #'test_asyncio': ['load_tests'],
-}
-
-func_skip = {
-    # sys.executable
-    'test_keyword': ['TestKeywordGeneration._generate_keywords'],
-    'test_popen': ['PopenTest._do_test_commandline'],
-}
-
-# unittest.TestSuite
-func_empty_suite = {
-    'test_importlib': ['load_tests'],
-}
-
 capi_tests = {
-    'test_array': ['BaseTest.test_obsolete_write_lock'],
-    'test_atexit': ['SubinterpreterTest'],
-    'test_buffer': ['TestBufferProtocol.test_memoryview_sizeof'],
-    'test_bytes': ['ByteArrayTest.test_obsolete_write_lock'],
-    'test_call': ['FastCallTests'],
-    'test_cmath': ['CMathTests.test_polar_errno'],
-    'test_codecs': ['BasicUnicodeTest.test_basics_capi'],
-    'test_coroutines': ['CAPITest'],
-    'test_csv': ['Test_Csv.test_writerows_legacy_strings'],
-    'test_decimal': [
+    'test.test_array': ['BaseTest.test_obsolete_write_lock'],
+    'test.test_atexit': ['SubinterpreterTest'],
+    'test.test_buffer': ['TestBufferProtocol.test_memoryview_sizeof'],
+    'test.test_bytes': ['ByteArrayTest.test_obsolete_write_lock'],
+    'test.test_call': ['FastCallTests'],
+    'test.test_cmath': ['CMathTests.test_polar_errno'],
+    'test.test_codecs': ['BasicUnicodeTest.test_basics_capi'],
+    'test.test_coroutines': ['CAPITest'],
+    'test.test_csv': ['Test_Csv.test_writerows_legacy_strings'],
+    'test.test_decimal': [
         'CExplicitConstructionTest.test_from_legacy_strings',
         'PyExplicitConstructionTest.test_from_legacy_strings',
         'CContextAPItests.test_from_legacy_strings',
         'PyContextAPItests.test_from_legacy_strings',
     ],
-    'test_deque': ['TestBasic.test_sizeof'],
-    'test_dict': ['CAPITest', 'DictTest.test_splittable_setattr_after_pop'],
-    'test_fcntl': [
+    'test.test_deque': ['TestBasic.test_sizeof'],
+    'test.test_dict': ['CAPITest', 'DictTest.test_splittable_setattr_after_pop'],
+    'test.test_fcntl': [
         'TestFcntl.test_fcntl_bad_file_overflow',
         'TestFcntl.test_flock_overflow',
     ],
-    'test_fileio': ['COtherFileTests.testInvalidFd_overflow'],
-    'test_finalization': ['LegacyFinalizationTest'],
-    'test_float': ['IEEEFormatTestCase.test_serialized_float_rounding'],
-    'test_format': ['FormatTest.test_precision_c_limits'],
-    'test_gc': [
+    'test.test_fileio': ['COtherFileTests.testInvalidFd_overflow'],
+    'test.test_finalization': ['LegacyFinalizationTest'],
+    'test.test_float': ['IEEEFormatTestCase.test_serialized_float_rounding'],
+    'test.test_format': ['FormatTest.test_precision_c_limits'],
+    'test.test_gc': [
         'GCTests.test_legacy_finalizer',
         'GCTests.test_legacy_finalizer_newclass',
     ],
-    'test_genericclass': ['CAPITest'],
-    'test_exceptions': [
+    'test.test_genericclass': ['CAPITest'],
+    'test.test_exceptions': [
         'ExceptionTests.testSettingException',
         'ExceptionTests.test_MemoryError',
         'ExceptionTests.test_exception_with_doc',
         'ExceptionTests.test_memory_error_cleanup',
     ],
-    'test_import': [
+    'test.test_import': [
         'ImportTests.test_from_import_missing_attr_has_name_and_so_path',
     ],
-    'test_inspect': [
+    'test.test_inspect': [
         'TestClassesAndFunctions.test_getfullagrspec_builtin_func',
         'TestClassesAndFunctions.test_getfullagrspec_builtin_func_no_signature',
         'TestSignatureObject.test_signature_on_builtins',
@@ -177,129 +148,115 @@ capi_tests = {
         'TestSignatureObject.test_signature_on_decorated_builtins',
         'TestSignatureObject.test_signature_on_builtins',
     ],
-    'test_io': [
+    'test.test_io': [
         'CTextIOWrapperTest.test_device_encoding',
         'PyTextIOWrapperTest.test_device_encoding',
     ],
-    'test_poll': ['PollTests.test_poll_c_limits'],
-    'test_posix': ['PosixTester.test_pipe2_c_limits'],
-    'test_repl': ['TestInteractiveInterpreter.test_no_memory'],
-    'test_socket': [
+    'test.test_poll': ['PollTests.test_poll_c_limits'],
+    'test.test_posix': ['PosixTester.test_pipe2_c_limits'],
+    'test.test_repl': ['TestInteractiveInterpreter.test_no_memory'],
+    'test.test_socket': [
         'GeneralModuleTests.testNtoHErrors',
         'GeneralModuleTests.test_listen_backlog_overflow',
         'BasicTCPTest._testShutdown_overflow',
         'BasicTCPTest._testShutdown_overflow',
         'NonBlockingTCPTests.testSetBlocking_overflow',
     ],
-    'test_sys': [
+    'test.test_sys': [
         'SysModuleTest.test_getallocatedblocks',
         'SysModuleTest.test_setrecursionlimit_recursion_depth',
         'SizeofTest',
     ],
-    'test_threading': [
+    'test.test_threading': [
         'ThreadTests.test_frame_tstate_tracing',
         'SubinterpThreadingTests.test_threads_join',
         'SubinterpThreadingTests.test_threads_join_2',
     ],
-    'test_unicode': [
+    'test.test_unicode': [
         'CAPITest',
         'UnicodeTest.test_formatting_c_limits',
         'UnicodeTest.test_formatting_huge_precision_c_limits',
     ],
-    'test_userstring': ['UserStringTest.test_formatting_c_limits'],
-    'test_weakref': ['ReferencesTestCase.test_cfunction'],
+    'test.test_userstring': ['UserStringTest.test_formatting_c_limits'],
+    'test.test_weakref': ['ReferencesTestCase.test_cfunction'],
 }
-
-def raise_skip(reason):
-    raise SkipTest(reason)
-
-force_skip = lambda *args, **kwargs: raise_skip('skip reason in test runner')
-
-def teardown_fixup(self):
-    self.visit = 1
-    raise_skip('testcapi missing')
-
-#del test.test_doctest.__dict__['test_unicode']  # possibly sys.executable
-#test.test_keyword.TestKeywordGeneration._generate_keywords = lambda *args, **kwargs: raise_skip('exec sys.executable')
-# test.test_popen.PopenTest._do_test_commandline = lambda *args, **kwargs: raise_skip('exec sys.executable')
 
 sys_executable_tests = {
     'distutils.tests.test_spawn': ['SpawnTestCase.test_find_executable'],
     'lib2to3.tests.test_parser': ['TestPgen2Caching.test_load_grammar_from_subprocess'],
-    'test_atexit': ['GeneralTest.test_shutdown'],
-    'test_base64': ['TestMain'],
-    #'test_asyncio.test_events'
-    'test_builtin': ['ShutdownTest'],
-    'test_calendar': ['CommandLineTestCase'],
-    'test_cgitb': [
+    'test.test_atexit': ['GeneralTest.test_shutdown'],
+    'test.test_base64': ['TestMain'],
+    'test.test_builtin': ['ShutdownTest'],
+    'test.test_calendar': ['CommandLineTestCase'],
+    'test.test_cgitb': [
         'TestCgitb.test_syshook_no_logdir_default_format',
         'TestCgitb.test_syshook_no_logdir_text_format',
     ],
-    'test_cmd_line': ['CmdLineTest'],
-    'test_compileall': [
+    'test.test_cmd_line': ['CmdLineTest'],
+    'test.test_compileall': [
         'CommmandLineTestsNoSourceEpoch',
         'CommmandLineTestsWithSourceEpoch',
     ],
-    'test_cprofile': [
+    'test.test_cprofile': [
         'CProfileTest.test_module_path_option',
         'TestCommandLine',
     ],
-    'test_exceptions': [
+    'test.test_exceptions': [
         'ExceptionTests.test_memory_error_in_PyErr_PrintEx',
         'ExceptionTests.test_recursion_normalizing_exception',
         'ExceptionTests.test_recursion_normalizing_infinite_exception',
         'ExceptionTests.test_recursion_normalizing_with_no_memory',
     ],
-    'test_gc': ['GCTests.test_garbage_at_shutdown'],
-    'test_gzip': ['TestCommandLine'],
+    'test.test_gc': ['GCTests.test_garbage_at_shutdown'],
+    'test.test_gzip': ['TestCommandLine'],
     'test.test_json.test_tool': ['TestTool.test_stdin_stdout'],
-    'test_multiprocessing_fork': [
+    'test.test_multiprocessing_fork': [
         'TestFlags.test_flags',
         'TestStartMethod.test_context',
         'TestStartMethod.test_set_get',
     ],
-    'test_os': [
+    'test.test_os': [
         'PidTests.test_getppid',
         'SpawnTests',
         'URandomTests.test_urandom_subprocess',
     ],
-    'test_parser': ['ParserStackLimitTestCase.test_trigger_memory_error'],
-    'test_platform': ['PlatformTest.test_popen'],
+    'test.test_parser': ['ParserStackLimitTestCase.test_trigger_memory_error'],
+    'test.test_platform': ['PlatformTest.test_popen'],
 
-    'test_quopri': [
+    'test.test_quopri': [
         'QuopriTestCase.test_scriptdecode',
         'QuopriTestCase.test_scriptencode',
     ],
-    'test_regrtest': ['ArgsTestCase', 'ProgramsTestCase'],
+    'test.test_regrtest': ['ArgsTestCase', 'ProgramsTestCase'],
 
-    'test_script_helper': [
+    'test.test_script_helper': [
         'TestScriptHelper.test_assert_python_failure',
         'TestScriptHelper.test_assert_python_ok_raises',
     ],
-    'test_tarfile': ['CommandLineTest'],
-    'test_threading': [
+    'test.test_tarfile': ['CommandLineTest'],
+    'test.test_threading': [
         'SubinterpThreadingTests.test_daemon_threads_fatal_error',
         'ThreadTests.test_finalize_runnning_thread',
     ],
-    'test_trace': ['TestCommandLine', 'TestCoverageCommandLineOutput'],
-    'test_traceback': [
+    'test.test_trace': ['TestCommandLine', 'TestCoverageCommandLineOutput'],
+    'test.test_traceback': [
         'CExcReportingTests',
         'TracebackCases.test_encoded_file',
         'TracebackFormatTests',
     ],
-    'test_support': [
+    'test.test_support': [
         'TestSupport.test_args_from_interpreter_flags',
         'TestSupport.test_optim_args_from_interpreter_flags',
     ],
-    'test_sys': [
+    'test.test_sys': [
         'SysModuleTest.test_executable',
         'SysModuleTest.test_ioencoding',
         'SysModuleTest.test_recursionlimit_fatalerror',
         'SysModuleTest.test_sys_tracebacklimit',
     ],
-    'test_tracemalloc': ['TestCommandLine'],
-    'test_unicodedata': ['UnicodeMiscTest.test_failed_import_during_compiling'],
-    'test_venv': [
+    'test.test_tracemalloc': ['TestCommandLine'],
+    'test.test_unicodedata': ['UnicodeMiscTest.test_failed_import_during_compiling'],
+    'test.test_venv': [
         'EnsurePipTest',
         'BasicTest.test_deactivate_with_strict_bash_opts',
         'BasicTest.test_executable',
@@ -307,22 +264,22 @@ sys_executable_tests = {
         'BasicTest.test_multiprocessing',
         'BasicTest.test_prefixes',
     ],
-    'test_warnings_broken': [
+    'test.test_warnings_broken': [
         'CEnvironmentVariableTests.test_conflicting_envvar_and_command_line',
         'PyEnvironmentVariableTests.test_conflicting_envvar_and_command_line',
     ],
-    'test_zipfile': ['CommandLineTest'],
+    'test.test_zipfile': ['CommandLineTest'],
     'unittest.test.test_program': ['TestCommandLineArgs.testSelectedTestNamesFunctionalTest'],
     'unittest.test.test_runner': ['Test_TextTestRunner.test_warnings'],
 }
 
 removed_data_tests = {
-    'test_source_encoding': [
+    'test.test_source_encoding': [
         'MiscSourceEncodingTest.test_bad_coding',
         'MiscSourceEncodingTest.test_bad_coding2',
     ],
-    'test_tokenize': ['TestTokenizerAdheresToPep0263.test_bad_coding_cookie'],
-    'test_future': [
+    'test.test_tokenize': ['TestTokenizerAdheresToPep0263.test_bad_coding_cookie'],
+    'test.test_future': [
         'FutureTest.test_badfuture3',
         'FutureTest.test_badfuture4',
         'FutureTest.test_badfuture5',
@@ -332,49 +289,49 @@ removed_data_tests = {
         'FutureTest.test_badfuture9',
         'FutureTest.test_badfuture10',
     ],
-    'test_py_compile': [
+    'test.test_py_compile': [
         'PyCompileTestsWithSourceEpoch.test_bad_coding',
         'PyCompileTestsWithoutSourceEpoch.test_bad_coding',
     ],
-    'test_unicode_identifiers': ['PEP3131Test.test_invalid'],
-    'test_utf8source': ['PEP3120Test.test_badsyntax'],
+    'test.test_unicode_identifiers': ['PEP3131Test.test_invalid'],
+    'test.test_utf8source': ['PEP3120Test.test_badsyntax'],
 }
 
 # test import/filename oddities, likely due to __file__ hacks
 filename_diff_tests = {
-    'test_exceptions': [
+    'test.test_exceptions': [
         'ExceptionTests.test_unhandled',
         'ExceptionTests.test_unraisable',
     ],
-    'test_asyncore': ['HelperFunctionTests.test_compact_traceback'],
+    'test.test_asyncore': ['HelperFunctionTests.test_compact_traceback'],
 
-    'test_dis': [
+    'test.test_dis': [
         'DisTests.test_bug_1333982',
         'DisTests.test_disassemble_recursive',
         'DisWithFileTests.test_bug_1333982',
         'DisWithFileTests.test_disassemble_recursive',
     ],
-    'test_import': ['ImportTracebackTests'],
-    'test_inspect': ['TestRetrievingSourceCode.test_getsourcefile'],
-    'test_profile': ['ProfileTest.test_cprofile'],
-    'test_pyexpat': ['HandlerExceptionTest.test_exception'],
-    'test_trace': [
+    'test.test_import': ['ImportTracebackTests'],
+    'test.test_inspect': ['TestRetrievingSourceCode.test_getsourcefile'],
+    'test.test_profile': ['ProfileTest.test_cprofile'],
+    'test.test_pyexpat': ['HandlerExceptionTest.test_exception'],
+    'test.test_trace': [
         'TestCallers',
         'TestCoverage',
         'TestFuncs',
         'TestLineCounts',
         'TestRunExecCounts',
     ],
-    'test_traceback': [
+    'test.test_traceback': [
         'MiscTracebackCases.test_extract_stack',
         'TestStack.test_format_locals',
     ],
-    'test_warnings': [
+    'test.test_warnings': [
         'CWarnTests.test_stacklevel',
         'CWarnTests.test_stacklevel_import',
         'PyWarnTests.test_stacklevel_import',
     ],
-    'test_multiprocessing_fork': ['WithProcessesTestSubclassingProcess.test_stderr_flush'],
+    'test.test_multiprocessing_fork': ['WithProcessesTestSubclassingProcess.test_stderr_flush'],
     'unittest.test.test_case': [
         'Test_TestCase.testAssertWarnsContext',
         'Test_TestCase.testAssertWarnsRegexContext',
@@ -382,13 +339,10 @@ filename_diff_tests = {
 }
 
 # Entire or substantial module failures, some unknown reasons
-# doctest:
-#test.test_pdb.test_list_commands = skip('known module failures')
-
 substantial_module_skip = {
-    'test_bdb': ['StateTestCase','BreakpointTestCase','IssuesTestCase'],
-    'test_c_locale_coercion': ['LocaleCoercionTests', 'LocaleConfigurationTests'],
-    'test_concurrent_futures': [
+    'test.test_bdb': ['StateTestCase', 'BreakpointTestCase', 'IssuesTestCase'],
+    'test.test_c_locale_coercion': ['LocaleCoercionTests', 'LocaleConfigurationTests'],
+    'test.test_concurrent_futures': [
         'ProcessPoolForkExecutorDeadlockTest',
         'ProcessPoolForkProcessPoolShutdownTest.test_context_manager_shutdown',
         'ProcessPoolForkProcessPoolShutdownTest.test_del_shutdown',
@@ -407,24 +361,22 @@ substantial_module_skip = {
         'ProcessPoolSpawnProcessPoolShutdownTest',
         'ProcessPoolSpawnWaitTest',
     ],
-    'test_dataclasses': ['TestMakeDataclass.test_non_identifier_field_names'],
-    'test_ensurepip': ['TestBootstrap', 'TestBootstrappingMainFunction'],
-    'test_faulthandler': ['FaultHandlerTests'],
-    'test_hash': [
-        'BytesHashRandomizationTests','MemoryviewHashRandomizationTests',
+    'test.test_dataclasses': ['TestMakeDataclass.test_non_identifier_field_names'],
+    'test.test_ensurepip': ['TestBootstrap', 'TestBootstrappingMainFunction'],
+    'test.test_faulthandler': ['FaultHandlerTests'],
+    'test.test_hash': [
+        'BytesHashRandomizationTests', 'MemoryviewHashRandomizationTests',
         'StrHashRandomizationTests',
         'DatetimeDateTests.test_randomized_hash',
         'DatetimeDatetimeTests.test_randomized_hash',
         'DatetimeTimeTests.test_randomized_hash',
     ],
-    'test_gc': ['GCTests.test_get_count'],
+    'test.test_gc': ['GCTests.test_get_count'],
     'test.test_importlib.extension.test_loader': [
         'Frozen_MultiPhaseExtensionModuleTests',
         'Source_MultiPhaseExtensionModuleTests',
         'Frozen_LoaderTests',
         'Source_LoaderTests',
-        #'Source_InspectLoaderTests',
-        # 'Source_ExecModuleTests',
     ],
     'test.test_importlib.frozen.test_finder': [
         'Frozen_FindSpecTests',
@@ -432,7 +384,6 @@ substantial_module_skip = {
     ],
     'test.test_importlib.frozen.test_loader': [
         'Frozen_ExecModuleTests',
-        #'Frozen_InspectLoaderTests',
         'Source_ExecModuleTests',
         'Source_InspectLoaderTests',
         'Source_LoaderTests',
@@ -449,6 +400,7 @@ substantial_module_skip = {
         'SeparatedNestedZipNamespacePackages',
         'SeparatedZipNamespacePackages',
         'SingleNestedZipNamespacePackage',
+        'ZipWithMissingDirectory',
     ],
     'test.test_importlib.test_read': ['ReadZipTests'],
     'test.test_importlib.test_path': [
@@ -460,16 +412,15 @@ substantial_module_skip = {
         'PathZipTests',
         'PathDiskTests.test_reading',
     ],
-    'test.test_importlib.test_namespace_pkgs': ['ZipWithMissingDirectory'],
     'test.test_importlib.test_open': ['OpenZipTests'],
 
 
-    'test_logging': ['QueueListenerTest', 'ExceptionTest.test_formatting'],
-    'test_multiprocessing_fork': ['TestSemaphoreTracker'],
-    'test_multiprocessing_main_handling': [
+    'test.test_logging': ['QueueListenerTest', 'ExceptionTest.test_formatting'],
+    'test.test_multiprocessing_fork': ['TestSemaphoreTracker'],
+    'test.test_multiprocessing_main_handling': [
         'ForkCmdLineTest', 'ForkServerCmdLineTest', 'SpawnCmdLineTest',
     ],
-    'test_pdb': [
+    'test.test_pdb': [
         'PdbTestCase.test_issue13120',
         'PdbTestCase.test_issue16180',
         'PdbTestCase.test_blocks_at_first_code_line',
@@ -485,7 +436,7 @@ substantial_module_skip = {
         'PdbTestCase.test_run_pdb_with_pdb',
     ],
     # extra 'sys' in sys.modules
-    'test_modulefinder': [
+    'test.test_modulefinder': [
         'ModuleFinderTest.test_absolute_imports',
         'ModuleFinderTest.test_maybe',
         'ModuleFinderTest.test_maybe_new',
@@ -493,16 +444,16 @@ substantial_module_skip = {
         'ModuleFinderTest.test_replace_paths',
     ],
     # missing source code?
-    'test_atexit': ['GeneralTest.test_print_tracebacks'],
-    'test_coroutines': ['OriginTrackingTest.test_origin_tracking_warning'],
-    'test_inspect': [
+    'test.test_atexit': ['GeneralTest.test_print_tracebacks'],
+    'test.test_coroutines': ['OriginTrackingTest.test_origin_tracking_warning'],
+    'test.test_inspect': [
         'TestRetrievingSourceCode.test_getframeinfo_get_first_line',
         'TestInterpreterStack.test_stack',
         'TestInterpreterStack.test_trace',
     ],
     'unittest.test.testmock.testpatch': ['PatchTest.test_tracebacks'],
     # ValueError: sys.__spec__ is None
-    'test_pkgutil': [
+    'test.test_pkgutil': [
         'ImportlibMigrationTests.test_find_loader_avoids_emulation',
         'ImportlibMigrationTests.test_get_loader_avoids_emulation',
     ],
@@ -512,7 +463,7 @@ substantial_module_skip = {
         'TestRefactoringTool.test_false_file_encoding',
         'TestRefactoringTool.test_file_encoding',
     ],
-    'test_warnings': [
+    'test.test_warnings': [
         '_WarningsTests.test_default_action',
         'CFilterTests.test_filterwarnings',
         'CFilterTests.test_mutate_filter_list',
@@ -520,44 +471,44 @@ substantial_module_skip = {
         'CFilterTests.test_error_after_default',
         'CFilterTests.test_ignore_after_default',
     ],
-    'test_zipimport': ['CompressedZipImportTestCase', 'UncompressedZipImportTestCase'],
-    'test_zipimport_support': ['ZipSupportTests'],
+    'test.test_zipimport': ['CompressedZipImportTestCase', 'UncompressedZipImportTestCase'],
+    'test.test_zipimport_support': ['ZipSupportTests'],
 }
 
 oddballs = {
-    'test_getpass': ['GetpassRawinputTest.test_uses_stderr_as_default'],
-    'test_imp': [
+    'test.test_getpass': ['GetpassRawinputTest.test_uses_stderr_as_default'],
+    'test.test_imp': [
         'ImportTests.test_issue1267',
         'ImportTests.test_issue16421_multiple_modules_in_one_dll',
         'ImportTests.test_issue24748_load_module_skips_sys_modules_check',
         'ImportTests.test_load_from_source',
     ],
-    'test_import': [
+    'test.test_import': [
         'ImportTests.test_concurrency',
         'RelativeImportTests.test_import_from_unloaded_package',
         'ImportTests.test_delete_builtins_import',
     ],
-    'test_logging': ['StreamHandlerTest.test_error_handling'],
-    'test_threaded_import': ['ThreadedImportTests.test_parallel_path_hooks'],
-    'test_threading': ['InterruptMainTests.test_interrupt_main_error'],
-    'test_pkgutil': [
+    'test.test_logging': ['StreamHandlerTest.test_error_handling'],
+    'test.test_threaded_import': ['ThreadedImportTests.test_parallel_path_hooks'],
+    'test.test_threading': ['InterruptMainTests.test_interrupt_main_error'],
+    'test.test_pkgutil': [
         'PkgutilTests.test_getdata_filesys',
         'PkgutilTests.test_getdata_zipfile',
         'PkgutilTests.test_walkpackages_filesys',
         'PkgutilTests.test_walkpackages_zipfile',
     ],
-    'test_pydoc': ['PydocDocTest.test_mixed_case_module_names_are_lower_cased'],
-    'test_socket': [
+    'test.test_pydoc': ['PydocDocTest.test_mixed_case_module_names_are_lower_cased'],
+    'test.test_socket': [
         'BasicTCPTest.testShutdown_overflow',
         'BasicTCPTest2.testShutdown_overflow',
     ],
-    'test_sys': [
+    'test.test_sys': [
         'SysModuleTest.test_c_locale_surrogateescape',
         'SysModuleTest.test_posix_locale_surrogateescape',
         'SysModuleTest.test_current_frames',
     ],
-    'test_traceback': ['PyExcReportingTests.test_cause_recursive'],
-    'test_warnings': ['PyWarnTests.test_missing_filename_main_with_argv'],
+    'test.test_traceback': ['PyExcReportingTests.test_cause_recursive'],
+    'test.test_warnings': ['PyWarnTests.test_missing_filename_main_with_argv'],
     'unittest.test.test_discovery': ['TestDiscovery.test_discovery_from_dotted_path_builtin_modules'],
     'unittest.test.testmock.testsentinel': ['SentinelTest.testPickle'],
     'unittest.test.testmock.testwith': ['TestMockOpen.test_mock_open_read_with_argument'],
@@ -565,7 +516,7 @@ oddballs = {
 }
 
 missing_source = {
-    'test_inspect': [
+    'test.test_inspect': [
         'TestDecorators.test_decorator_with_lambda',
         'TestDecorators.test_getsource_unwrap',
         'TestDecorators.test_replacing_decorator',
@@ -594,11 +545,11 @@ missing_source = {
         'TestGettingSourceOfToplevelFrames.test_range_toplevel_frame',
         'TestGettingSourceOfToplevelFrames.test_range_traceback_toplevel_frame',
     ],
-    'test_linecache': [
+    'test.test_linecache': [
         'LineCacheTests.test_lazycache_already_cached',
         'LineCacheTests.test_lazycache_smoke',
     ],
-    'test_multiprocessing_fork': ['WithProcessesTestPool.test_traceback'],
+    'test.test_multiprocessing_fork': ['WithProcessesTestPool.test_traceback'],
 }
 
 test_skip_sets = {
@@ -609,53 +560,34 @@ test_skip_sets = {
     'significant problems': substantial_module_skip,
     'oddballs': oddballs,
     'missing symbol': {
-        'test_threading': ['ThreadTests.test_PyThreadState_SetAsyncExc'],
+        'test.test_threading': ['ThreadTests.test_PyThreadState_SetAsyncExc'],
         'distutils.tests.test_build_ext': ['BuildExtTestCase'],
     },
     'missing internals': {
-        'test_pyclbr': ['PyclbrTest'],
+        'test.test_pyclbr': ['PyclbrTest'],
     },
     'PyOxidizer repr': {
-        'test_frame': ['ReprTest.test_repr'],
-        'test_reprlib': ['LongReprTest.test_module'],
-        'test_fstring': ['TestCase.test_global'],
-        'test_module': [
+        'test.test_frame': ['ReprTest.test_repr'],
+        'test.test_reprlib': ['LongReprTest.test_module'],
+        'test.test_fstring': ['TestCase.test_global'],
+        'test.test_module': [
             'ModuleTests.test_module_repr_builtin',
             'ModuleTests.test_module_repr_source',
         ],
-        'test_pydoc': ['PydocImportTest.test_importfile'],
+        'test.test_pydoc': ['PydocImportTest.test_importfile'],
     },
     'test logic unexpected builtins': {
-        'test_rlcompleter': ['TestRlcompleter.test_global_matches']
+        'test.test_rlcompleter': ['TestRlcompleter.test_global_matches']
     },
-    'missing os.__cached__': {'test_pydoc': ['PydocDocTest.test_synopsis_sourceless']},
+    'missing os.__cached__': {
+        'test.test_pydoc': ['PydocDocTest.test_synopsis_sourceless'],
+    },
     'needs rpmbuild': {'distutils.tests.test_bdist_rpm': ['BuildRpmTestCase']},
-    #'needs clang': {
-    #    'distutils.tests.test_build_ext': [
-    #        'BuildExtTestCase.test_build_ext',
-    #        'ParallelBuildExtTestCase.test_build_ext',
-    #    ],
-    #    'distutils.tests.test_install': ['InstallTestCase.test_record_extensions'],
-    #},
-    # sysconfig.get_config_var("platlibdir") empty
-    #'platlibdir empty': {'test_sysconfig': ['TestSysConfig.test_user_similar']},
-    # sysconfig.get_makefile_filename() is 'lib/python3.7/config-3.7m-x86_64-linux-gnu/Makefile' not present
-    #'get_makefile_filename not present': {'test_sysconfig': ['MakefileTests.test_get_makefile_filename']},
-    #'get_config_h not present': {
-    #    'test_sysconfig': ['TestSysConfig.test_get_config_h_filename'],
-    #    'distutils.tests.test_sysconfig': ['SysconfigTestCase.test_get_config_h_filename'],
-    #},
-    #'srcdir not present': {
-    #    'test_sysconfig': ['TestSysConfig.test_srcdir'],
-    #    'distutils.tests.test_sysconfig': ['SysconfigTestCase.test_srcdir'],
-    #},
-    '__hello__ not implemented': {'test_frozen': ['TestFrozen.test_frozen']},
-    'removed functions': func_delete,
-    'forced skip functions': func_skip,
+    '__hello__ not implemented': {'test.test_frozen': ['TestFrozen.test_frozen']},
     "traceback style": {
-        'test_concurrent_futures': ['ProcessPoolExecutorTest.test_traceback'],
-        'test_pydoc': ['TestDescriptions.test_typing_pydoc'],
-        'test_traceback': [
+        'test.test_concurrent_futures': ['ProcessPoolExecutorTest.test_traceback'],
+        'test.test_pydoc': ['TestDescriptions.test_typing_pydoc'],
+        'test.test_traceback': [
             'PyExcReportingTests.test_cause',
             'PyExcReportingTests.test_cause_and_context',
             'PyExcReportingTests.test_cause_and_context',
@@ -672,20 +604,17 @@ test_skip_sets = {
          ],
     },
     'timezone': {
-        'test_strptime': [
+        'test.test_strptime': [
             'CacheTests.test_TimeRE_recreation_timezone',
             'StrptimeTests.test_bad_timezone',
         ],
-        'test_xmlrpc': ['DateTimeTestCase.test_default'],
+        'test.test_xmlrpc': ['DateTimeTestCase.test_default'],
     },
 }
 
 if not _have_stdlib_source:
     test_skip_sets['missing source'] = missing_source
 
-
-def noop(*args, **kwargs):
-    pass
 
 """
 def raise_skip(reason):
@@ -694,54 +623,111 @@ def raise_skip(reason):
 force_skip = lambda *args, **kwargs: raise_skip('see autotest.py')
 """
 
-def doctor_module(name, module):
-    #print("doctor_module", name, module)
-    test_module = get_test_module(name)
 
-    if test_module == 'test_gc':
-        cls = getattr(module, 'GCCallbackTests')
-        setattr(cls, 'test_collect_garbage', teardown_fixup)
+def raise_skip(reason):
+    raise SkipTest(reason)
 
+
+# The tearDown requires `self.visit` be set during the test method
+def gc_teardown_fixup(name, module):
+    if name != 'test.test_gc':
+        return
+
+    def test_collect_garbage(self):
+        self.visit = []
+        raise_skip('testcapi missing')
+
+    module.GCCallbackTests.test_collect_garbage = test_collect_garbage
+
+
+def empty_test_suite(*args, **kwargs):
+    import unittest
+    return unittest.TestSuite()
+
+
+def noop(*args, **kwargs):
+    pass
+
+
+def force_skip(*args, **kwargs):
+    raise_skip('skip reason in test runner')
+
+
+overwrites = {
+    # sys.executable
+    'test.test_doctest': {
+        'test_CLI': noop,
+        'test_unicode': noop,
+    },
+    'test.test_keyword': {
+        'TestKeywordGeneration': force_skip,
+    },
+    'test.test_popen': {
+        'PopenTest._do_test_commandline': force_skip,
+    },
+    # substantial problems
+    'test.test_pdb': {'test_list_commands': noop},
+    'test.test_importlib': {'load_tests': empty_test_suite},
+}
+
+
+def _replace_module_attr_hook(name, module, module_hook_data):
+    data = module_hook_data.get(name)
+    if not data:
+        return
+
+    for name, new_value in data.items():
+        parts = name.split('.')
+        if len(parts) == 2:
+            obj = getattr(module, parts[0])
+            attr = parts[1]
+        else:
+            obj = module
+            attr = parts[0]
+
+        setattr(obj, attr, new_value)
+
+
+def add_data_hook(module_hook_data, module_data_hook, names=None):
+    def _hook(name, module):
+        if name not in names:
+            return
+        module_data_hook(name, module, module_hook_data)
+
+    if not names:
+        names = module_hook_data.keys()
+
+    return import_hooks.add_after_import_hook(names, _hook)
+
+
+def skip_hook(name, module):
     for message, test_skips in test_skip_sets.items():
-        skip_data = test_skips.get(test_module, [])
+        skip_data = test_skips.get(name, [])
         for item in skip_data:
             attr, _, meth = item.partition('.')
-            if test_skips == func_empty_suite:
-                setattr(module, attr, unittest.TestSuite())
-                continue
-
-            if test_skips == func_skip:
-                setattr(module, attr, force_skip)
-                continue
-            if test_skips == func_delete:
-                setattr(module, attr, noop)
-                continue
             cls = getattr(module, attr)
-            # print('doctoring %s %s %s' % (test_module, attr, meth))
+            # print('skipping %s %s %s' % (name, attr, meth))
             if meth:
                 setattr(cls, meth, skip(message))
             else:
                 setattr(module, attr, skip(message)(cls))
 
-#test_skip_dicts =
-test_skip_set_modules = [
-    module
-    for d in test_skip_sets.values()
-    for module in d.keys()
-]
-test_skip_set_modules = [
-    'test.' + name if name.startswith('test_') else name
-    for name in test_skip_set_modules
-]
-
-import_hooks.add_after_import_hook(test_skip_set_modules, doctor_module)
 
 import_hooks.ignore_del_missing_modules(['spam'])
+add_data_hook(overwrites, _replace_module_attr_hook)
+import_hooks.add_after_import_hook('test.test_gc', gc_teardown_fixup)
+
+test_skip_set_modules = [
+    module
+    for data in test_skip_sets.values()
+    for module in data.keys()
+]
+import_hooks.add_after_import_hook(test_skip_set_modules, skip_hook)
+
 
 import test.support
 test.support.check_sizeof = lambda *args, **kwargs: raise_skip('testcapi missing')
 test.support.run_in_subinterp = lambda *args, **kwargs: raise_skip('testcapi missing')
-
 
 # sys.executable isnt compatible with python CLI
 import test.support.script_helper
@@ -754,13 +740,11 @@ from test.libregrtest import main
 # Invoke with arg `test_distutils` or `test_sysconfig` to test specific modules.  `test_lib2to3`.
 try:
     main(
-        #['test_multiprocessing_fork'],  #, 'test_multiprocessing_forkserver', 'test_json', 'test_lib2to3', 'test_tools'],  #, 'test_idle', 'test_import', 'test_importlib'],
-        #["ctypes.test"],
-        #["lib2to3.tests"],
+        # ['test_foo'],
         verbose2=True,
-        #exclude=True,
-   )
+        # exclude=True,
+    )
 except SystemExit as e:
-   if not e:
-       print(e)
-   sys.exit(e)
+    if not e:
+        print(e)
+    sys.exit(e)
