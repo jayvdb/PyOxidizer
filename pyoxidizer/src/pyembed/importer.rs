@@ -447,7 +447,7 @@ py_class!(class PyOxidizerFinder |py| {
         }
 
         // Only create a reader if the name is a package.
-        //if self.packages(py).contains(&*key) {
+        if self.packages(py).contains(&*key) {
 
             // Not all packages have known resources.
             let resources = match self.resources(py).get(&*key) {
@@ -462,9 +462,9 @@ py_class!(class PyOxidizerFinder |py| {
             resource_readers.insert(key.to_string(), reader.clone_ref(py));
 
             Ok(reader)
-        //} else {
-        //    Ok(py.None())
-        //}
+        } else {
+            Ok(py.None())
+        }
     }
 });
 
