@@ -1,4 +1,10 @@
+import os.path
+import sys
+
 import import_hooks
+
+import external_file_dunder
+
 
 skip_test_modules = set([
     # Core dumps due to   File "test.support", line 172 in _save_and_remove_module
@@ -34,49 +40,63 @@ skip_test_modules = set([
     "test.test_importlib.extension.test_finder",
 ])
 
-import_hooks.add_no_load(skip_test_modules)
-
-import os.path
-cpython_root = './build/target/x86_64-unknown-linux-gnu/debug/pyoxidizer/python.608871543e6d/python/install/lib/python3.7/'
-cpython_root = os.path.abspath(cpython_root)
-import_hooks.add_external_cpython_test_file_dunder(cpython_root)
+import_hooks.add_empty_load(skip_test_modules)
 
 
-# inspect.findsource(inspect)
+dist_root = './build/target/x86_64-unknown-linux-gnu/debug/pyoxidizer/python.608871543e6d/python/install'
+dist_root = os.path.abspath(dist_root)
+cpython_root = dist_root + '/lib/python3.7/'
 
-import sys
+os.environ['_PYTHON_PROJECT_BASE'] = dist_root
+sys._home = dist_root
+
+# This is needed to set base paths needed for sysconfig to provide the
+# correct paths, esp Python.h
+sys.base_exec_prefix = sys.exec_prefix = sys.base_prefix = sys.prefix = dist_root
+
+
+
+external_file_dunder.add_external_cpython_test_file_dunder(cpython_root)
+
+
+# This is the equivalent of inspect.findsource(inspect).
+# When if fails, assume stdlib was built without source included
+# and some tests will be disabled as they rely on source
+
+_pyox_loader = sys.meta_path[0]
+
 try:
-    sys.meta_path[0].get_source('inspect')
+    _pyox_loader.get_source('inspect')
     _have_stdlib_source = True
 except Exception:
     _have_stdlib_source = False
 
 # This module is unusable unless another import hook is created
-import_hooks.add_external_file_dunder(cpython_root, ['lib2to3.pygram'])
+external_file_dunder.add_external_file_dunder(cpython_root, ['lib2to3.pygram'])
 
 # These need analysis to determine whether the need for __file__ renders the module unusable
 
 # This should be refined to specific tests where argparse.__file__ is needed, and/or
 # argparse patched to work without __file__
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_argparse', 'argparse')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_ast', 'ast')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_imp', 'imp')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_import', 'os')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_import', 'importlib._bootstrap_external')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_import', 'importlib._bootstrap')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_linecache', 'linecache')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_modulefinder', 'tempfile')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_multiprocessing_fork', 'multiprocessing')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_pydoc', 'pydoc')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_pydoc', 'string')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_venv', 'venv')
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_zipfile', 'email')
-import_hooks.add_file_dunder_during(cpython_root, 'unittest.test', 'unittest')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_argparse', 'argparse')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_ast', 'ast')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_imp', 'imp')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_import', 'os')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_import', 'importlib._bootstrap_external')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_import', 'importlib._bootstrap')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_linecache', 'linecache')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_modulefinder', 'tempfile')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_multiprocessing_fork', 'multiprocessing')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_pydoc', 'pydoc')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_pydoc', 'string')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_venv', 'venv')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_zipfile', 'email')
+external_file_dunder.add_file_dunder_during(cpython_root, 'unittest.test', 'unittest')
 
-import_hooks.add_file_dunder_during(cpython_root, 'distutils.tests', 'distutils')
+external_file_dunder.add_file_dunder_during(cpython_root, 'distutils.tests', 'distutils')
 
 # not working
-import_hooks.add_file_dunder_during(cpython_root, 'test.test_urllib2', 'urllib.request')
+external_file_dunder.add_file_dunder_during(cpython_root, 'test.test_urllib2', 'urllib.request')
 
 print('during hooks added')
 
@@ -193,7 +213,7 @@ capi_tests = {
 def raise_skip(reason):
     raise SkipTest(reason)
 
-force_skip = lambda *args, **kwargs: raise_skip('see autotest.py')
+force_skip = lambda *args, **kwargs: raise_skip('skip reason in test runner')
 
 def teardown_fixup(self):
     self.visit = 1
@@ -590,6 +610,7 @@ test_skip_sets = {
     'oddballs': oddballs,
     'missing symbol': {
         'test_threading': ['ThreadTests.test_PyThreadState_SetAsyncExc'],
+        'distutils.tests.test_build_ext': ['BuildExtTestCase'],
     },
     'missing internals': {
         'test_pyclbr': ['PyclbrTest'],
@@ -609,25 +630,25 @@ test_skip_sets = {
     },
     'missing os.__cached__': {'test_pydoc': ['PydocDocTest.test_synopsis_sourceless']},
     'needs rpmbuild': {'distutils.tests.test_bdist_rpm': ['BuildRpmTestCase']},
-    'needs clang': {
-        'distutils.tests.test_build_ext': [
-            'BuildExtTestCase.test_build_ext',
-            'ParallelBuildExtTestCase.test_build_ext',
-        ],
-        'distutils.tests.test_install': ['InstallTestCase.test_record_extensions'],
-    },
+    #'needs clang': {
+    #    'distutils.tests.test_build_ext': [
+    #        'BuildExtTestCase.test_build_ext',
+    #        'ParallelBuildExtTestCase.test_build_ext',
+    #    ],
+    #    'distutils.tests.test_install': ['InstallTestCase.test_record_extensions'],
+    #},
     # sysconfig.get_config_var("platlibdir") empty
-    'platlibdir empty': {'test_sysconfig': ['TestSysConfig.test_user_similar']},
+    #'platlibdir empty': {'test_sysconfig': ['TestSysConfig.test_user_similar']},
     # sysconfig.get_makefile_filename() is 'lib/python3.7/config-3.7m-x86_64-linux-gnu/Makefile' not present
-    'get_makefile_filename not present': {'test_sysconfig': ['MakefileTests.test_get_makefile_filename']},
-    'get_config_h not present': {
-        'test_sysconfig': ['TestSysConfig.test_get_config_h_filename'],
-        'distutils.tests.test_sysconfig': ['SysconfigTestCase.test_get_config_h_filename'],
-    },
-    'srcdir not present': {
-        'test_sysconfig': ['TestSysConfig.test_srcdir'],
-        'distutils.tests.test_sysconfig': ['SysconfigTestCase.test_srcdir'],
-    },
+    #'get_makefile_filename not present': {'test_sysconfig': ['MakefileTests.test_get_makefile_filename']},
+    #'get_config_h not present': {
+    #    'test_sysconfig': ['TestSysConfig.test_get_config_h_filename'],
+    #    'distutils.tests.test_sysconfig': ['SysconfigTestCase.test_get_config_h_filename'],
+    #},
+    #'srcdir not present': {
+    #    'test_sysconfig': ['TestSysConfig.test_srcdir'],
+    #    'distutils.tests.test_sysconfig': ['SysconfigTestCase.test_srcdir'],
+    #},
     '__hello__ not implemented': {'test_frozen': ['TestFrozen.test_frozen']},
     'removed functions': func_delete,
     'forced skip functions': func_skip,
@@ -666,10 +687,12 @@ if not _have_stdlib_source:
 def noop(*args, **kwargs):
     pass
 
+"""
 def raise_skip(reason):
     raise SkipTest(reason)
 
 force_skip = lambda *args, **kwargs: raise_skip('see autotest.py')
+"""
 
 def doctor_module(name, module):
     #print("doctor_module", name, module)
@@ -728,6 +751,7 @@ test.support.script_helper.run_python_until_end = lambda *args, **kwargs: raise_
 
 from test.libregrtest import main
 
+# Invoke with arg `test_distutils` or `test_sysconfig` to test specific modules.  `test_lib2to3`.
 try:
     main(
         #['test_multiprocessing_fork'],  #, 'test_multiprocessing_forkserver', 'test_json', 'test_lib2to3', 'test_tools'],  #, 'test_idle', 'test_import', 'test_importlib'],
@@ -736,5 +760,7 @@ try:
         verbose2=True,
         #exclude=True,
    )
-except SystemExit:
-   pass
+except SystemExit as e:
+   if not e:
+       print(e)
+   sys.exit(e)
