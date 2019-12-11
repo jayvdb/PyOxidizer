@@ -1,11 +1,28 @@
-#no tests
-#certstream
-#click-completion
-#click-help-colors
-#hashID
-#mulpyplexer
-#stdlib-list
-#termcolor
+
+
+atomicwrites==1.3.0
+html5lib==1.0.1
+humanize==0.4
+hypothesis==4.46.1
+python-memcached==1.58
+python-mimeparse==1.6.0
+rfc3987==1.3.8
+u-msgpack-python==2.5.1
+webencodings==0.5.1
+strict_rfc3339
+versiontools==1.9.1
+webcolors==1.8.1
+iso8601
+tzlocal
+
+padme
+bson==0.5.8
+backcall==0.1.0
+blinker==1.4
+colorclass==2.2.0
+docrepr==0.1.1
+python-dotenv==0.10.2
+fastimport==0.9.8
 
 ConfigUpdater
 Flask
@@ -61,7 +78,6 @@ pluggy
 plumbum
 precis-i18n
 psutil
-# ptyprocess depends on flit -> pytoml
 pyasn1
 pycountry
 pycparser

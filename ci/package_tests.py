@@ -1,6 +1,6 @@
 run_all = False
 quit_early = False
-ignore_star_test_ignore = False
+ignore_star_test_ignore = True  #False
 
 from pprint import pprint
 import importlib
@@ -8,9 +8,31 @@ import os
 import os.path
 import sys
 
-dist_root = './build/target/x86_64-unknown-linux-gnu/debug/pyoxidizer/python.608871543e6d/python/install'
-dist_root = os.path.abspath(dist_root)
-cpython_root = dist_root + '/lib/python3.7/'
+
+def _get_build_info():
+    build_apps_dir = str(os.path.join('build', 'apps')) + os.path.sep
+    assert build_apps_dir in sys.executable
+    build_dir, _, suffix = sys.executable.partition(build_apps_dir)
+    suffix_parts = suffix.split(os.path.sep)
+    assert len(suffix_parts) == 4
+    assert suffix_parts[0] == suffix_parts[-1]
+    app_name, rust_target_id, build_type = suffix_parts[:-1]
+    return build_dir, app_name, rust_target_id, build_type
+
+def _get_dist_root():
+    build_dir, app_name, rust_target_id, build_type = _get_build_info()
+    dist_root = os.path.join(build_dir, 'target', rust_target_id, build_type,
+                             'pyoxidizer', 'python.608871543e6d', 'python', 'install')
+    return dist_root
+
+def _get_cpython_stdlib(dist_root):
+    if sys.platform == 'nt':
+        return os.path.join(dist_root, 'Lib')
+    else:
+        return os.path.join(dist_root, 'lib', ('python'+sys.version[0:3]))
+
+dist_root = _get_dist_root()
+ext_stdlib_root = _get_cpython_stdlib(dist_root)
 
 os.environ['_PYTHON_PROJECT_BASE'] = dist_root
 sys._home = dist_root
@@ -21,7 +43,28 @@ sys.base_exec_prefix = sys.exec_prefix = sys.base_prefix = sys.prefix = dist_roo
 
 from distutils.sysconfig import get_python_lib  # used to determine stdlib
 
-import import_hooks
+from import_hooks import (
+    add_import_error,
+    add_empty_load,
+    add_after_import_hook,
+    unregister_import_hook,
+)
+
+from external_file_dunder import (
+    add_external_file_dunder,
+    add_file_dunder_during,
+    add_relocated_external_file_dunder,
+    add_external_cpython_test_file_dunder,
+)
+
+from file_resource_redirect import (
+    add_junk_file_dunder,
+    redirect_get_data_resources_open_binary,
+    overload_open,
+    certifi_where_hack,
+    _fake_root,
+)
+
 
 # FIXME:
 _platbase = '/usr/lib64/python3.7/lib-dynload/'
@@ -31,6 +74,7 @@ base_pytest_args = [
     '-c/dev/null',  # TODO: make OS agnostic
     '-rs',
     '--disable-pytest-warnings',
+    '-Wignore',
     #'--cache-clear',
     '-pno:cacheprovider',
     # Breaks --ignore
@@ -48,6 +92,7 @@ base_pytest_args.append('--maxfail=10')
 
 
 package_base_patterns = [
+    '/home/jayvdb/projects/osc/home:jayvdb:branches:devel:languages:python/python-{pypi_name}/{pypi_name}-{version}/',
     '/home/jayvdb/projects/osc/d-l-py/python-{pypi_name}/{pypi_name}-{version}/',
     '/home/jayvdb/projects/osc/d-l-py/python-{pypi_name}{version_major}/{pypi_name}-{version}/',
     '/home/jayvdb/projects/osc/devel:languages:python:pytest/python-{pypi_name}/{pypi_name}-{version}/',
@@ -110,9 +155,12 @@ class TestPackage:
 # These looks like tests, but are not
 not_tests = ['jinja2.tests']
 
+# This module is unusable unless another import hook is created
+add_external_file_dunder(ext_stdlib_root, ['lib2to3.pygram'])
+
 no_load_packages = [
     # setuptools loads lib2to3, which tries to load its grammar file
-    'lib2to3',
+    #'lib2to3',
 
     # https://github.com/HypothesisWorks/hypothesis/issues/2196
     # 'hypothesis', 'hypothesis.extra.pytestplugin',
@@ -121,17 +169,17 @@ no_load_packages = [
     # however it is needed by httpbin
     # 'brotli',
     # requests uses built extension simplejson if present
-    'simplejson',
+    #'simplejson',
     # hypothesis uses django and numpy if present,
     # and those cause built extensions to load
     'django', 'numpy',
     # Other packages which will load built extension
     #'flask',
-    'scandir',
+    #'scandir',
 ]
-import_hooks.add_import_error(no_load_packages)
+add_import_error(no_load_packages)
 
-import_hooks.add_empty_load([
+add_empty_load([
     # 'pytest-cov' and 'coverage' may exist commonly in site-packages,
     # however coverage uses a built extension which we do not want to load
     'pytest_cov', 'pytest_cov.plugin',
@@ -177,9 +225,9 @@ empty_load_packages = [
     'antigravity',
 ]
 
-import_hooks.add_empty_load(empty_load_packages)
+add_empty_load(empty_load_packages)
 
-import_hooks.add_junk_file_dunder([
+add_junk_file_dunder([
     'pluggy',
     'coverage.html', 'coverage.control',
     'pycparser.c_lexer', 'pycparser.c_parser',
@@ -191,15 +239,15 @@ import_hooks.add_junk_file_dunder([
 ])
 
 
-import_hooks.add_after_import_hook(
+add_after_import_hook(
     ['certifi.core'],
-    import_hooks.certifi_where_hack,
+    certifi_where_hack,
 )
 
-import_hooks.add_empty_load(no_load_packages)
-h = import_hooks.add_empty_load(['networkx.algorithms.tree.recognition'])
+add_empty_load(no_load_packages)
+h = add_empty_load(['networkx.algorithms.tree.recognition'])
 import networkx
-import_hooks.unregister_import_hook(h)
+unregister_import_hook(h)
 
 import sys
 del sys.modules['networkx.algorithms.tree.recognition']
@@ -207,15 +255,15 @@ del sys.modules['networkx.algorithms.tree.recognition']
 import networkx.algorithms.tree.recognition
 print(networkx.algorithms.tree.recognition.__spec__)
 
-import_hooks.add_junk_file_dunder([
+add_junk_file_dunder([
     'hashid',
 ], is_module=True)
 
 
-import_hooks.redirect_get_data_resources_open_binary(['pytz', 'jsonschema', 'text_unidecode', 'pyx'])
-import_hooks.redirect_get_data_resources_open_binary(['dateutil.zoneinfo', 'jsonrpcclient.parse'], is_module=True)
-import_hooks.overload_open(['lark.load_grammar', 'lark.tools.standalone'], is_module=True)
-import_hooks.overload_open(['pycountry', 'pycountry.db', 'stdlib_list.base'])
+redirect_get_data_resources_open_binary(['pytz', 'jsonschema', 'text_unidecode', 'pyx'])
+redirect_get_data_resources_open_binary(['dateutil.zoneinfo', 'jsonrpcclient.parse'], is_module=True)
+overload_open(['lark.load_grammar', 'lark.tools.standalone'], is_module=True)
+overload_open(['pycountry', 'pycountry.db', 'stdlib_list.base'])
 
 # doesnt work:
 #import_hooks.redirect_get_data_resources_open_binary(['yaspin'], is_module=True)
@@ -228,26 +276,26 @@ import_hooks.overload_open(['pycountry', 'pycountry.db', 'stdlib_list.base'])
 
 
 # dont work: 'phabricator', 'tldextract', 's3transfer'
-import_hooks.overload_open(['whois', 'depfinder', 'virtualenv'])
+overload_open(['whois', 'depfinder', 'virtualenv'])
 
 # for tinycss2
 #import pathlib
 #pathlib._NormalAccessor.open = pathlib._normal_accessor.open = import_hooks._catch_fake_open
 
 # This module is unusable unless another import hook is created
-#import_hooks.add_external_file_dunder(cpython_root, ['lib2to3.pygram'])
+#import_hooks.add_external_file_dunder(ext_stdlib_root, ['lib2to3.pygram'])
 
 # black:
-import_hooks.add_relocated_external_file_dunder(cpython_root, 'blib2to3.pygram', 'b')
+add_relocated_external_file_dunder(ext_stdlib_root, 'blib2to3.pygram', 'b')
 
-import_hooks.add_file_dunder_during(cpython_root, 'test_future.test_imports_urllib', 'urllib')
-import_hooks.add_file_dunder_during(cpython_root, 'greenlet', 'distutils')
-import_hooks.add_file_dunder_during(cpython_root, 'hypothesis', 'os')
+add_file_dunder_during(ext_stdlib_root, 'test_future.test_imports_urllib', 'urllib')
+add_file_dunder_during(ext_stdlib_root, 'greenlet', 'distutils')
+add_file_dunder_during(ext_stdlib_root, 'hypothesis', 'os')
 
 #import_hooks.add_external_file_dunder( , 'tornado.testing')
 
 #import_hooks.add_relocated_external_file_dunder(
-#    cpython_root, "blist.test.test_support", "blist")
+#    ext_stdlib_root, "blist.test.test_support", "blist")
 #import blist.test.test_support
 
 assert sys.oxidized
@@ -259,6 +307,8 @@ _pyox_modules = list(pyox_finder.package_list())
 def aggressive_import(name):
     if 'python-' in name:
         name = name.replace('python-', '')
+    if '-python' in name:  # u-msgpack-python
+        name = name.replace('-python', '')
 
     exceptions = []
 
@@ -325,6 +375,13 @@ def aggressive_import(name):
         except ImportError as e:
             exceptions.append(e)
 
+    if '_' in name:
+        try:  # u-msgpack-python
+            mod = importlib.import_module(name.replace('_', ''))
+            return mod
+        except ImportError as e:
+            exceptions.append(e)
+
     if exceptions:
         raise exceptions[0]
 
@@ -338,13 +395,13 @@ def _find_version(mod, verbose=False):
 
     try:
         version = mod.__version__
-    except AttributeError as e:
+    except AttributeError:
         try:
             version = mod.version
-        except AttributeError as e2:
+        except AttributeError:
             try:
                 version = mod.VERSION
-            except AttributeError as e2:
+            except AttributeError:
                 pass
 
     if not version or name == 'pytimeparse':
@@ -409,6 +466,12 @@ def _find_version(mod, verbose=False):
     if verbose:
         print('_find_version({}) = {}'.format(mod, version))
 
+    if not isinstance(version, str):
+        version = str(version)
+
+    if version.endswith('.final.0'):
+        version = version.replace('.final.0', '')
+
     return version
 
 def _find_tests_under(base, mod_name, verbose=False):
@@ -435,6 +498,8 @@ def _find_tests_under(base, mod_name, verbose=False):
         return 'tests.py'
     elif os.path.exists(base + 'test_' + mod_name + '.py'):  # six
         return 'test_' + mod_name + '.py'
+    elif os.path.exists(base + mod_name + '_test.py'):  # mimeparse
+        return mod_name + '_test.py'
     elif os.path.exists(base + 'simple_unit_tests.py'):  # pyparsing
         return 'simple_unit_tests.py'
     elif os.path.exists(base + 'unitTests.py'):  # pyparsing not working
@@ -658,6 +723,11 @@ def run_pytest(package, test_path=None, add_test_file_dunder=False, verbose=Fals
                         test_path = mod_path + '/' + test_path
                         add_test_file_dunder = test_path
                 if not test_path:
+                    test_path = _find_tests_under(package_base + mod_name + '-python/', mod_name)  # hypothesis
+                    if test_path:
+                        package_base += mod_name + '-python/'
+                        add_test_file_dunder = test_path
+                if not test_path:
                     test_path = _find_tests_under(package_base + 'src/' + mod_path + '/', mod_name)
                     if test_path:
                         package_base += 'src/'
@@ -714,14 +784,16 @@ def run_pytest(package, test_path=None, add_test_file_dunder=False, verbose=Fals
         if add_test_file_dunder not in not_tests:
             #if verbose:
             print('Adding __file__ for {} @ {}'.format(add_test_file_dunder, package_base))
-            hooks.append(import_hooks.add_external_file_dunder(package_base, [add_test_file_dunder]))
+            hooks.append(add_external_file_dunder(package_base, [add_test_file_dunder]))
 
     if mod_name == 'tornado':
-        hooks.append(import_hooks.add_external_file_dunder(package_base, ['tornado.testing']))
+        hooks.append(add_external_file_dunder(package_base, ['tornado.testing']))
 
     pytest_args = base_pytest_args.copy()
     if test_path == 't/' or mod_name in ['billiard', 'vine']:
         pytest_args.remove('-c/dev/null')
+    if mod_name == 'websockets':
+        pytest_args.remove('-Wignore')
 
     if mod_name == 'ruamel.yaml':
         pytest_args += ['--ignore', '_test/lib']
@@ -747,7 +819,7 @@ def run_pytest(package, test_path=None, add_test_file_dunder=False, verbose=Fals
     print("Running {}-{} tests: {}> pytest {}".format(pypi_name, version, package_base, pytest_args))
     rv = pytest.main(pytest_args)
     for hook in hooks:
-        import_hooks.unregister_import_hook(hook)
+        unregister_import_hook(hook)
     return rv
 
 
@@ -792,9 +864,7 @@ def run_tests(packages, skip={}, quit_early=False, verbose=False):
         if not isinstance(package, TestPackage):
             package = TestPackage(package)
 
-        mod_name = package.mod_name 
         excludes = package.test_ignores
-        version = package.version
 
         pypi_name = package.pypi_name
 
@@ -836,21 +906,21 @@ def run_tests(packages, skip={}, quit_early=False, verbose=False):
 # for Pyphen needs os.listdir hacked
 import pkg_resources
 def fake_resource_filename(package, name):
-    return '{}/{}/{}'.format(import_hooks._fake_root, package, name)
+    return '{}/{}/{}'.format(_fake_root, package, name)
 
 pkg_resources.resource_filename = fake_resource_filename
 
 
 # Needed for test.support.__file__
 
-import_hooks.add_external_cpython_test_file_dunder(cpython_root, support_only=True)
+add_external_cpython_test_file_dunder(ext_stdlib_root, support_only=True)
 
-import_hooks.add_relocated_external_file_dunder(
-    cpython_root, 'future.backports.urllib.request', 'future.backports')
+add_relocated_external_file_dunder(
+    ext_stdlib_root, 'future.backports.urllib.request', 'future.backports')
 
 
 # Needed by psutil test_setup_script
-import_hooks.add_file_dunder_during(cpython_root, 'setuptools', 'distutils')
+add_file_dunder_during(ext_stdlib_root, 'setuptools', 'distutils')
 
 # needs test.support
 regex_package = TestPackage('regex', [
@@ -860,6 +930,22 @@ regex_package = TestPackage('regex', [
 
 
 packages = [
+    TestPackage('pyelftools', [  # uses 'test/' so is good to place early to ensure no cpython `test` problems
+        'run_examples_test.py',  # ImportError: cannot import name 'run_exe' from 'utils' (unknown location)
+        # probably need to de-import 'utils' loaded from another package test suite
+    ]),
+
+    TestPackage('tornado', test_ignores=[
+        '*',
+        'TestIOStreamWebMixin', 'TestReadWriteMixin', 'TestIOStreamMixin',
+        'AutoreloadTest', 'GenCoroutineTest', 'HTTPServerRawTest', 'UnixSocketTest', 'BodyLimitsTest', 'TestIOLoopConfiguration', 'TestIOStream', 'TestIOStreamSSL', 'TestIOStreamSSLContext', 'TestPipeIOStream',
+        'LoggingOptionTest',
+        'SubprocessTest',
+        'simple_httpclient_test',  # a few failures
+        'test_error_line_number_extends_sub_error',
+    ]),  # lots of failures
+
+    #...,
     TestPackage('pycountry', [
         'test_subdivisions_directly_accessible',  # 4844 vs 4836
         'test_locales',  # fails in gettext
@@ -875,20 +961,59 @@ packages = [
     TestPackage('async-timeout'),  # ln -s python-async_timeout python-async-timeout
     #...,
 
-    TestPackage('tornado', test_ignores=[
+    TestPackage('websocket-client', mod_name='websocket'),
+    TestPackage('websockets'),  # opensuse outdated
+
+    TestPackage('setuptools', [  # outdated
+    ], other_mods=['easy_install', 'pkg_resources']),  # mostly not useful within PyOxidizer, esp without pip, however pkg_resources is very important
+    #TestPackage('html5lib', [
+    #    'test_stream.py',
+    #    'testdata/',
+    #]), # ==1.0.1
+    TestPackage('humanize', ['*']), # ==0.4  __file__
+    TestPackage('hypothesis', [
         '*',
-        'TestIOStreamWebMixin', 'TestReadWriteMixin', 'TestIOStreamMixin',
-        'AutoreloadTest', 'GenCoroutineTest', 'HTTPServerRawTest', 'UnixSocketTest', 'BodyLimitsTest', 'TestIOLoopConfiguration', 'TestIOStream', 'TestIOStreamSSL', 'TestIOStreamSSLContext', 'TestPipeIOStream',
-        'LoggingOptionTest',
-        'SubprocessTest',
-        'simple_httpclient_test',  # a few failures
-        'test_error_line_number_extends_sub_error',
-    ]),  # lots of failures
+        'django/', 'numpy/', 'pandas/', 'py2/', 'dpcontracts/',
+        'pytest/',
+        'py3/test_lookup_py38.py',
+        'datetime/test_dateutil_timezones.py',
+        'cover/test_settings.py',  # fixture 'testdir' not found
+    ]), # ==4.46.1  ln -s hypothesis-hypothesis-python-4.46.1 hypothesis-4.46.1
+    TestPackage('python-memcached', [
+        'TestMemcache',  # needs running memcached
+    ], mod_name='memcache'), # ==1.58
+    TestPackage('python-mimeparse'), # ==1.6.0  ln -s mimeparse_test.py python_mimeparse_test.py
+    TestPackage('rfc3987'), # ==1.3.8  # use -- doctest
+    TestPackage('u-msgpack-python'), # ==2.5.1
+    TestPackage('strict-rfc3339', version='0.7'),  # ln -s strict-rfc3339-version-0.7 strict-rfc3339-0.7
+
+    TestPackage('versiontools', [
+        'test_cant_import', 'test_not_found',  # minor ImportError string differences
+    ]), # ==1.9.1
+    TestPackage('tzlocal', [
+        'test_fail',  # UserWarning: Can not find any timezone configuration, defaulting to UTC.
+    ], version='2.0.0'),  # /usr/lib/python3.7/site-packages/tzlocal/
+    TestPackage('padme'),
+    TestPackage('webencodings'), # ==0.5.1
+    TestPackage('webcolors'), # ==1.8.1
+    TestPackage('atomicwrites'), # ==1.3.0
+    TestPackage('iso8601', version='0.1.12'),  # /usr/lib/python3.7/site-packages/iso8601/
+
+    TestPackage('bson', version='0.5.8'), #==0.5.8  # "bson.tests", line 8, in <module> NameError: name '__file__' is not defined
+    TestPackage('backcall'), #==0.1.0
+    TestPackage('blinker'), #==1.4
+    TestPackage('colorclass', ['*']), #==2.2.0  has no tests
+    TestPackage('docrepr', ['*']), #==0.1.1  has no tests
+    TestPackage('python-dotenv', ['test_cli.py', 'test_core.py']), #==0.10.2 depends on unix only `sh`
+    TestPackage('fastimport'), # ==0.9.8
+
+    #...,
+
     TestPackage('PyNaCl', [
-        '*',
+        # '*',
         'test_bindings.py', 'test_box.py',  # binary() got an unexpected keyword argument 'average_size'
         'test_wrong_types',  # pytest5 incompatibility
-    ], other_mods=['_sodium']),
+    ], other_mods=['nacl', '_sodium']),
 
     #...,
 
@@ -898,8 +1023,9 @@ packages = [
     TestPackage('unicodedata2'),
 
     TestPackage('ruamel.std.pathlib', ['*']),  # no tests?
-    TestPackage('ruamel.yaml', other_mods=['_ruamel_yaml']),  # upstream issue
-
+    TestPackage('ruamel.yaml', [
+        'test_collections_deprecation',
+    ], other_mods=['_ruamel_yaml']),  # upstream issue
     TestPackage('psutil', [
         '*',
         'test_process', 'TestProcessUtils', 'TestScripts', 'TestTerminatedProcessLeaks', 'test_multi_sockets_proc', 'test_memory_leaks',  # sys.executable
@@ -907,12 +1033,13 @@ packages = [
         'test_warnings_on_misses', 'test_missing_sin_sout', 'test_no_vmstat_mocked',  # filename issues
         'TestFSAPIs',  # DSO loading
         'test_connections',  # all but one fail
-        'test_emulate_use_sysfs', 'test_percent', 'test_cpu_affinity',  # vm problems
+        'TestSystemVirtualMemory', 'test_emulate_use_sysfs', 'test_percent', 'test_cpu_affinity',  # vm problems
         'test_power_plugged',
         'test_cmdline', 'test_name',  # probable bug in how psutil calculates PYTHON_EXE
         'test_sanity_version_check',  # need to disable psutil.tests.reload_module
         'test_cmdline', 'test_pids', 'test_issue_687', # strange
         'test_unix_socketpair',
+        'test_memory_info_ex',   # side effect of -Wignore
     ]),
     TestPackage('cffi', [
         '*',
@@ -934,6 +1061,7 @@ packages = [
         '*',
         'contrib/', 'with_dummyserver/', 'test_connectionpool.py', # requires tornado
         'test_cannot_import_ssl',  # probably oxidization makes test impossible
+        'test_disable_warnings',  # side-effect of -Wignore
         'test_render_part', 'test_parse_url', 'test_match_hostname_mismatch', 'test_url_vulnerabilities',
     ]),
     TestPackage('pyOpenSSL', [
@@ -941,13 +1069,13 @@ packages = [
         'memdbg.py',  # creates a DSO and fails when importing it
         'test_debug.py',
         'EqualityTestsMixin', 'util.py',  # pytest incompatible structure
+        'test_export_text',  # not sure
     ], mod_name='OpenSSL'),
     TestPackage('pycparser', [
         'test_c_generator.py', 'test_c_parser.py',  # inspect.getfile fails
     ], other_mods=['utils']),
     TestPackage('certifi', ['*']),  # has no tests
     TestPackage('pip', ['*']),  # completely broken, starting with __file__
-    TestPackage('setuptools', ['*'], other_mods=['easy_install', 'pkg_resources']),  # mostly not useful within PyOxidizer, esp without pip, however pkg_resources is very important
     TestPackage('cryptography', [
         '*',
         'test_vector_version',  # ignore mismatch of cryptography master vs vectors released
@@ -975,6 +1103,7 @@ packages = [
     TestPackage('PySocks', mod_name='socks', other_mods=['sockshandler'], test_ignores=['*']),  # requires test_server
 
     # not listed
+
 
     TestPackage('importlib-metadata', ['test_zip']),
     TestPackage('jsonschema', [
@@ -1007,10 +1136,7 @@ packages = [
         'test_debug.py', 'test_serving.py',   # hang somewhere in here
         'test_proxy_fix', 'test_http_proxy', 'test_append_slash_redirect',
         'test_shared_data_middleware',
-    ]),
-    TestPackage('pyelftools', [
-        'run_examples_test.py',  # ImportError: cannot import name 'run_exe' from 'utils' (unknown location)
-        # probably need to de-import 'utils' loaded from another package test suite
+        'test_quote_unquote_text',  # hypothesis error due to slowness
     ]),
 
 
@@ -1073,6 +1199,7 @@ packages = [
     TestPackage('dulwich', [
         '*',
         'test_blackbox', 'GitReceivePackTests', 'test_missing_arg',  # subprocess
+        'test_iterblobs',  # side-effect of -Wignore
     ]),
     TestPackage('yarl'),
     TestPackage('multidict'),
@@ -1098,7 +1225,6 @@ packages = [
     #'six',  # opensuse outdated
     TestPackage('semver'),  # opensuse outdated
     TestPackage('shellingham'),
-    TestPackage('websockets'),  # opensuse outdated
     TestPackage('asn1crypto', [
         'test_load_order',  # test requires asn1crypto.__file__ ; rather than allow for all tests, disable one test,  # opensuse outdated
         'test_extended_date_strftime', 'test_extended_datetime_strftime',  # tz bug
@@ -1116,7 +1242,7 @@ packages = [
         'test_column_property_select',  # sqlite3.OperationalError: misuse of aggregate: max()
         'ComponentReflectionTest_sqlite',  # ComponentReflectionTest_sqlite+pysqlite_3_30_1.test_deprecated_get_primary_keys
         'test_deprecated_flags',  # AttributeError: 'object' object has no attribute '_sa_instance_state'
-    ]),  # outdated
+    ], mod_name='sqlalchemy'),  # outdated
     TestPackage('graphviz'),  # outdated
     TestPackage('python-slugify'),  # outdated
 
@@ -1203,8 +1329,9 @@ packages = [
         'TestAPI_UseIPv4Sockets', 'TestAPI_UseIPv6Sockets',
         'TestAPI_UseUnixSockets',
     ], version='1.3.1'),
-    TestPackage('WebOb', version='1.8.5'),
-    TestPackage('websocket-client', mod_name='websocket'),
+    TestPackage('WebOb', [
+        'test_update_behavior_warning',  # side-effect of -Wignore
+    ], version='1.8.5'),
     TestPackage('WebTest', ['*'], mod_name='webtest'),  # __file__
     TestPackage('xmlschema', ['*']),  # __file__
     TestPackage('yaspin', ['*']),  # __file__
@@ -1214,6 +1341,7 @@ packages = [
         '*',
         'test_invalid_url', 'test_parseexception_error_msg',  # pytest5 incompatibility
         'test_cpython_abi_py3', 'test_cpython_abi_py2', 'test_cpython_tags', 'test_sys_tags_on_mac_cpython', 'test_sys_tags_on_windows_cpython', 'test_sys_tags_linux_cpython',  # AttributeError: module 'packaging.tags' has no attribute '_cpython_abi'
+        'test_check_glibc_version_warning',  # side-effect of -Wignore
     ]),
     TestPackage('stdio-mgr', [
         'test_catch_warnings', 'test_capture_stderr_warn',  # pytest arg incompat
@@ -1265,8 +1393,8 @@ namespace_packages = {package.pypi_name.split('.')[0] for package in packages if
 
 # conflicks wiht './test.py'
 
-h = import_hooks.add_relocated_external_file_dunder(
-    cpython_root, 'backports.test', 'backports')
+h = add_relocated_external_file_dunder(
+    ext_stdlib_root, 'backports.test', 'backports')
 
 import backports.test.support
 backports.test.__file__
@@ -1282,7 +1410,7 @@ run_tests([regex_package], quit_early=quit_early)
 #sys_modules_post = set(sys.modules.copy())
 #print('new mods', sorted(sys_modules_post - sys_modules_pre))
 
-import_hooks.unregister_import_hook(h)
+unregister_import_hook(h)
 
 remove_test_modules()
 run_tests(packages, quit_early=quit_early)
@@ -1321,6 +1449,8 @@ untested = []
 
 for mod, info in _pyox_packages.items():
     for package in packages:
+        if package == ...:
+            continue
         if mod in package:
             # print('found {!r} in {!r}'.format(mod, package))
             if package not in test_results:
@@ -1340,9 +1470,11 @@ for mod, info in _pyox_packages.items():
         untested.append(TestPackage(mod))
 
 for mod in sorted(_pyox_modules):
-    if _is_std_lib(mod, cpython_root):
+    if _is_std_lib(mod, ext_stdlib_root):
         continue
     for package in packages:
+        if package == ...:
+            continue
         if mod in package:
             break
     else:

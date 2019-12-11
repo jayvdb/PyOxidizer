@@ -96,6 +96,18 @@ packaging_rules.append(
     )
 )
 
+packaging_rules.append(
+    PipInstallSimple(
+        "pygit2",
+        venv_path="venv",
+        extra_env={
+            "CC": "gcc",
+            "CXX": "g++",
+        },
+    )
+)
+
+
 # Override old pytest incompatible chardet with upcoming chardet
 packaging_rules.append(PipInstallSimple("git+https://github.com/chardet/chardet"))
 
@@ -104,6 +116,14 @@ packaging_rules.append(PipInstallSimple("git+https://github.com/chardet/chardet"
 #   File "importlib_metadata._compat", line 76, in matches
 # AttributeError: 'PyOxidizerFinder' object has no attribute '__module__'
 packaging_rules.append(PipInstallSimple("importlib-metadata==0.17"))
+
+# Override with latest, as pip build process could result in any setuptools being last
+packaging_rules.append(PipInstallSimple("setuptools==42.0.2"))
+
+packaging_rules.append(PackageRoot(
+    path="/home/jayvdb/projects/osc/devel:languages:python/python-setuptools/setuptools-42.0.2/", packages=["setuptools.tests"],
+))
+
 
 # Package .py files discovered in a local directory.
 #packaging_rules.append(PackageRoot(
@@ -131,28 +151,26 @@ packaging_rules.append(PackageRoot(
 ))
 
 packaging_rules.append(PackageRoot(
-    path="/home/jayvdb/projects/osc/devel:languages:python/python-setuptools/setuptools-41.4.0/", packages=["setuptools.tests"],
-))
-
-packaging_rules.append(PackageRoot(
     path="/home/jayvdb/projects/osc/devel:languages:python/python-pyparsing/pyparsing-2.4.5/", packages=["pyparsing.test"],
 ))
 
-#packaging_rules.append(PackageRoot(
-#    path="/home/jayvdb/projects/osc/devel:languages:python/python-tqdm/tqdm-4.38.0/", packages=["tqdm.tests"],
-#))
+packaging_rules.append(PackageRoot(
+    path="/home/jayvdb/projects/osc/devel:languages:python/python-tqdm/tqdm-4.38.0/", packages=["tqdm.tests"],
+))
 
-#packaging_rules.append(PackageRoot(
-#    path="/home/jayvdb/projects/osc/devel:languages:python/python-html5lib/html5lib-1.0.1/", packages=["html5lib.tests"],
-#))
+packaging_rules.append(PackageRoot(
+    path="/home/jayvdb/projects/osc/devel:languages:python/python-html5lib/html5lib-1.0.1/", packages=["html5lib.tests"],
+))
 
+packaging_rules.append(PackageRoot(
+    path="/home/jayvdb/projects/osc/devel:languages:python/python-bson/bson-0.5.8/", packages=["bson.tests"],
+))
+
+# no way
 #packaging_rules.append(PackageRoot(
 #    path="/home/jayvdb/projects/osc/devel:languages:python/python-pygit2/pygit2-0.28.2/", packages=["test"],
 #))
 
-#packaging_rules.append(PackageRoot(
-#    path="/home/jayvdb/projects/osc/devel:languages:python/python-bson/bson-0.5.8/", packages=["test"],
-#))
 
 #packaging_rules.append(PackageRoot(
 #    path="", packages=["foo.tests"],))
