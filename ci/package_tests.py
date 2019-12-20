@@ -1,12 +1,11 @@
 run_all = False
 quit_early = False
-ignore_star_test_ignore = True  #False
 
 from pprint import pprint
-import importlib
 import os
 import os.path
 import sys
+
 
 
 def _get_build_info():
@@ -41,7 +40,6 @@ sys._home = dist_root
 # correct paths, esp Python.h
 sys.base_exec_prefix = sys.exec_prefix = sys.base_prefix = sys.prefix = dist_root
 
-from distutils.sysconfig import get_python_lib  # used to determine stdlib
 
 from import_hooks import (
     add_import_error,
@@ -65,33 +63,16 @@ from file_resource_redirect import (
     _fake_root,
 )
 
+from xot import (
+    TestPackage,
+    run_tests,
+    set_package_base_patterns,
+    package_versions,
+    _is_std_lib,
+    remove_test_modules,
+)
 
-# FIXME:
-_platbase = '/usr/lib64/python3.7/lib-dynload/'
-
-base_pytest_args = [
-    '--continue-on-collection-errors',
-    '-c/dev/null',  # TODO: make OS agnostic
-    '-rs',
-    '--disable-pytest-warnings',
-    '-Wignore',
-    #'--cache-clear',
-    '-pno:cacheprovider',
-    # Breaks --ignore
-    '-pno:xdoctest',
-    # Breaks --ignore https://github.com/bitprophet/pytest-relaxed/issues/8
-    '-pno:relaxed',
-    '-pno:flaky',
-    '-pno:doctestplus',  # breaks jsonpointer tests
-    '-pno:profiling',  # broken regex SyntaxError('invalid escape sequence..')
-
-    # useful to check clashes of test packages with real packages
-    #'--import-mode=append',
-]
-base_pytest_args.append('--maxfail=10')
-
-
-package_base_patterns = [
+set_package_base_patterns([
     '/home/jayvdb/projects/osc/home:jayvdb:branches:devel:languages:python/python-{pypi_name}/{pypi_name}-{version}/',
     '/home/jayvdb/projects/osc/d-l-py/python-{pypi_name}/{pypi_name}-{version}/',
     '/home/jayvdb/projects/osc/d-l-py/python-{pypi_name}{version_major}/{pypi_name}-{version}/',
@@ -103,57 +84,9 @@ package_base_patterns = [
     '/home/jayvdb/projects/python/{pypi_name}/',
     '/home/jayvdb/projects/python/{mod_name}/',
     '/home/jayvdb/projects/osc/py-new/python-{pypi_name}/{pypi_name}-{version}/',
-]
+])
 
 
-
-class TestPackage:
-    def __init__(self, name, test_ignores=None, pypi_name=None, mod_name=None, version=None, other_mods=None):
-        self.pypi_name = pypi_name or name
-        self._mod_name = mod_name or name.replace('-', '_')
-        self._mods = [self.mod_name] + (other_mods or [])
-        self.version = version
-        self.test_ignores = test_ignores
-
-    @property
-    def _mod_is_default(self):
-        return self.mod_name == self.pypi_name.replace('-', '_')
-
-    @property
-    def mod_name(self):
-        return self._mod_name
-
-    @mod_name.setter
-    def mod_name(self, value):
-        self._mod_name = value
-        self._mods[0] = value
-
-    def __str__(self):
-        return self._mod_name
-
-    def __repr__(self):
-        return f'TestPackage({self.pypi_name})'
-
-    def __eq__(self, other):
-        if isinstance(other, str):
-            return other in self._mods
-        return super().__eq__(other)
-
-    def __contains__(self, item):
-        if item in self._mods:
-            #print('__contains__ {!r} {!r}'.format(self._mods, item))
-            return True
-        for mod in self._mods:
-            if item.startswith(mod + '.'):
-                return True
-        return False
-
-    def __hash__(self):
-        return hash(self._mod_name)
-
-
-# These looks like tests, but are not
-not_tests = ['jinja2.tests']
 
 # This module is unusable unless another import hook is created
 add_external_file_dunder(ext_stdlib_root, ['lib2to3.pygram'])
@@ -304,603 +237,10 @@ _pyox_modules = list(pyox_finder.package_list())
 
 # pyox_finder.__spec__.__module__ = None
 
-def aggressive_import(name):
-    if 'python-' in name:
-        name = name.replace('python-', '')
-    if '-python' in name:  # u-msgpack-python
-        name = name.replace('-python', '')
-
-    exceptions = []
-
-    if '-' in name:
-        try:
-            package, _, module = name.partition('-')
-            mod = __import__(name.replace('-', '.'), package)
-            mod = getattr(mod, module)
-            return mod
-        except ImportError as e:
-            exceptions.append(e)
-
-        name = name.replace('-', '_')
-
-    try:
-        mod = importlib.import_module(name)
-        return mod
-    except ImportError as e:
-        exceptions.append(e)
-    try:
-        mod = importlib.import_module(name.lower())
-        return mod
-    except ImportError as e:
-        exceptions.append(e)
-    try:
-        mod = importlib.import_module(name.upper())
-        return mod
-    except ImportError as e:
-        exceptions.append(e)
-
-    if name.lower().startswith('py'):
-        try:
-            mod = importlib.import_module(name[2:])
-            return mod
-        except ImportError as e:
-            exceptions.append(e)
-        try:
-            mod = importlib.import_module(name.lower()[2:])
-            return mod
-        except ImportError as e:
-            exceptions.append(e)
-
-    if name.lower().endswith('py'):
-        try:
-            mod = importlib.import_module(name[:-2])
-            return mod
-        except ImportError as e:
-            exceptions.append(e)
-        try:
-            mod = importlib.import_module(name.lower()[:-2])
-            return mod
-        except ImportError as e:
-            exceptions.append(e)
-
-    if name.lower().endswith('python'):
-        try:
-            mod = importlib.import_module(name[:-6])
-            return mod
-        except ImportError as e:
-            exceptions.append(e)
-        try:
-            mod = importlib.import_module(name.lower()[:-6])
-            return mod
-        except ImportError as e:
-            exceptions.append(e)
-
-    if '_' in name:
-        try:  # u-msgpack-python
-            mod = importlib.import_module(name.replace('_', ''))
-            return mod
-        except ImportError as e:
-            exceptions.append(e)
-
-    if exceptions:
-        raise exceptions[0]
-
-    raise ImportError('{} not found'.format(name))
-
-
-def _find_version(mod, verbose=False):
-    name = mod.__name__
-
-    version = None
-
-    try:
-        version = mod.__version__
-    except AttributeError:
-        try:
-            version = mod.version
-        except AttributeError:
-            try:
-                version = mod.VERSION
-            except AttributeError:
-                pass
-
-    if not version or name == 'pytimeparse':
-        try:
-            data = importlib.resources.open_binary(name, 'VERSION').read()
-            return data.decode('utf-8').strip()
-        except Exception as e:
-            if verbose:
-                print('_find_version({}): no file VERSION failed: {!r}'.format(name, e))
-
-    if not version:
-        try:
-            """v_mod = __import__(mod.__name__ + '.version', mod.__name__)
-            if verbose:
-                print('imported {!r}'.format(v_mod))
-            v_mod = v_mod.version
-            if verbose:
-                print('found version {!r}'.format(v_mod))
-            """
-            v_mod = importlib.import_module(mod.__name__ + '.version')
-            if verbose:
-                print('imported {!r}'.format(v_mod))
-        except ImportError as e:
-            if verbose:
-                print('_find_version({}): {!r}'.format(name, e))
-        else:
-            try:
-                version = v_mod.__version__
-            except AttributeError:
-                version = v_mod.version
-            if verbose:
-                print('found version {!r}'.format(version))
-
-    if not version:
-        try:  # pipx
-            v_mod = __import__(mod.__name__ + '.main', fromlist=['main'])
-            if verbose:
-                print('imported {!r}'.format(v_mod))
-            version = v_mod.__version__
-            if verbose:
-                print('found version {!r}'.format(v_mod))
-        except (AttributeError, ImportError) as e:
-            if verbose:
-                print('_find_version({}): {!r}'.format(name, e))
-
-    if name.startswith('unicodedata'):  # also includes unicodedata2
-        version = mod.unidata_version
-
-    if not version:
-        if verbose:
-            print(f'version not found for {mod}')
-        return
-
-    try:
-        version = version()
-    except Exception:
-        pass
-
-    if isinstance(version, tuple):
-        version = '.'.join(str(i) for i in version)
-
-    if verbose:
-        print('_find_version({}) = {}'.format(mod, version))
-
-    if not isinstance(version, str):
-        version = str(version)
-
-    if version.endswith('.final.0'):
-        version = version.replace('.final.0', '')
-
-    return version
-
-def _find_tests_under(base, mod_name, verbose=False):
-    base = base + '/' if not base.endswith('/') else base
-
-    if verbose:
-        print('looking under {}'.format(base))
-
-    # peewee if os.path.exists(base + 'runtests.py'):
-    #    return 'runtests.py'
-    if os.path.isdir(base + 'tests/'):
-        if os.path.isdir(base + 'tests/lib3/'):  # PyYAML
-            return 'tests/lib3/'
-        if mod_name == 'botocore' and os.path.isdir(base + 'tests/unit/'):
-            return 'tests/unit/'
-        if os.path.exists(base + 'tests/test.py'):
-            return 'tests/test.py'
-        if os.path.exists(base + 'tests/tests.py'):
-            return 'tests/tests.py'
-        if os.path.exists(base + 'test.py'):  # chardet 4 has tests/ and test.py
-            return 'test.py'
-        return 'tests/'
-    if os.path.exists(base + 'tests.py') and mod_name + '.tests' not in not_tests:
-        return 'tests.py'
-    elif os.path.exists(base + 'test_' + mod_name + '.py'):  # six
-        return 'test_' + mod_name + '.py'
-    elif os.path.exists(base + mod_name + '_test.py'):  # mimeparse
-        return mod_name + '_test.py'
-    elif os.path.exists(base + 'simple_unit_tests.py'):  # pyparsing
-        return 'simple_unit_tests.py'
-    elif os.path.exists(base + 'unitTests.py'):  # pyparsing not working
-        return 'unitTests.py'
-    elif os.path.isdir(base + 'test/'):  # todo: check for .py files
-        return 'test/'
-    elif os.path.isdir(base + '_test/'):  # ruamel.yaml
-        return '_test/'
-    elif os.path.isdir(base + 'testing/'):
-        return 'testing/'
-    elif os.path.isdir(base + 'ast3/tests/'):  # typed-ast
-        return 'ast3/tests/'
-    elif os.path.isdir(base + 't/'):  # celery: vine & billiard
-        if os.path.exists(base + 't/integration/tests/test_multiprocessing.py'):
-            return 't/unit/'  # billiard ^ is py2 only
-        return 't/'
-    elif os.path.exists(base + 'test.py'):
-        return 'test.py'
-
-
-PY2 = False
-py37_builtins = ('_abc', '_ast', '_codecs', '_collections', '_functools', '_imp', '_io', '_locale', '_operator', '_signal', '_sre', '_stat', '_string', '_symtable', '_thread', '_tracemalloc', '_warnings', '_weakref', 'atexit', 'builtins', 'errno', 'faulthandler', 'gc', 'itertools', 'marshal', 'posix', 'pwd', 'sys', 'time', 'xxsubtype', 'zipimport')
-
-def _is_std_lib(name, std_lib_dir):
-    name, _, _ = name.partition('.')
-    if name in py37_builtins:
-        return True
-    elif name in ['__phello__', 'config-3', '_frozen_importlib', '_frozen_importlib_external'] or name.startswith('config_3'):
-        return True
-    elif name in ['_pyoxidizer_importer']:
-        return True
-    rv = (os.path.isdir(std_lib_dir + name)
-          or os.path.exists(std_lib_dir + name + '.py')
-          or os.path.exists(_platbase + name + '.cpython-37m-x86_64-linux-gnu.so')  # TODO: use plat extension
-          )
-    #print('_is_std_lib', name, std_lib_dir)
-    return rv
-
-
-def package_versions(modules=None, builtins=None, namespace_packages=None,
-                     standard_lib=None, exclude_imported=False,
-                     std_lib_dir=None, verbose=False, exclude=None, exclude_main=True):
-    """Retrieve package version information.
-
-    When builtins or standard_lib are None, they will be included only
-    if a version was found in the package.
-
-    @param modules: Modules to inspect
-    @type modules: list of strings
-    @param builtins: Include builtins
-    @type builtins: Boolean, or None for automatic selection
-    @param standard_lib: Include standard library packages
-    @type standard_lib: Boolean, or None for automatic selection
-    """
-    if not modules:
-        modules = sys.modules.keys()
-
-    if not std_lib_dir:
-        std_lib_dir = get_python_lib(standard_lib=True)
-    std_lib_dir = (
-        std_lib_dir + '/' if not std_lib_dir.endswith('/') else std_lib_dir)
-
-    root_packages = {key.split('.')[0] for key in modules}
-    namespace_subpackages = set()
-    for nspkg in namespace_packages or []:
-        if nspkg not in root_packages:
-            continue
-        submodules = {'.'.join(key.split('.')[:2]) for key in modules if key.startswith(nspkg + '.')}
-        namespace_subpackages |= submodules
-
-    builtin_packages = {name.split('.')[0] for name in root_packages
-                        if name in sys.builtin_module_names
-                        or '_' + name in sys.builtin_module_names}
-
-    if standard_lib is False and builtins is None:
-        builtins = False
-
-    # Improve performance by removing builtins from the list if possible.
-    if builtins is False:
-        root_packages = set(root_packages - builtin_packages)
-    if exclude_main:
-        root_packages -= {'__main__', '__mp_main__'}
-
-    if verbose:
-        print('root packages:', sorted(root_packages))
-
-    std_lib_packages = []
-
-    paths = {}
-    data = {}
-
-    for name in sorted(root_packages | namespace_subpackages):
-        if exclude and name in exclude:
-            continue
-
-        info = {'name': name}
-
-        if _is_std_lib(name, std_lib_dir):
-            std_lib_packages.append(name)
-            if standard_lib is False:
-                continue
-            info['type'] = 'standard libary'
-
-        if name in builtin_packages:
-            info['type'] = 'builtins'
-
-        # print('About to import {}'.format(name))
-        if exclude_imported and name in sys.modules:
-            if verbose:
-                print(f'Skipping {name}')
-            continue
-
-        try:
-            package = importlib.import_module(name)
-        except Exception as e:
-            if verbose:
-                print('import_module({}) failed: {!r}'.format(name, e))
-            info['err'] = e
-            data[name] = info
-            continue
-
-        info['package'] = package
-
-        if '__file__' in package.__dict__ and package.__file__:
-            # Determine if this file part is of the standard library.
-            if os.path.normcase(package.__file__).startswith(
-                    os.path.normcase(std_lib_dir)):
-                std_lib_packages.append(name)
-                if standard_lib is False:
-                    continue
-                info['type'] = 'standard libary'
-
-            # Strip '__init__.py' from the filename.
-            path = package.__file__
-            if '__init__.py' in path:
-                path = path[0:path.index('__init__.py')]
-
-            if PY2:
-                path = path.decode(sys.getfilesystemencoding())
-
-            info['path'] = path
-            if path in paths:
-                print('Path {} of the package {} is already in defined paths assosciated with {}'.format(path, package, paths[path]))
-            paths[path] = name
-        else:
-            if _is_std_lib(name, std_lib_dir):
-                std_lib_packages.append(name)
-                if standard_lib is False:
-                    continue
-                info['type'] = 'standard libary'
-
-        version = _find_version(package)
-        if version:
-            info['ver'] = version
-
-        # If builtins or standard_lib is None,
-        # only include package if a version was found.
-        if (builtins is None and name in builtin_packages) or \
-                (standard_lib is None and name in std_lib_packages):
-            if 'ver' in info:
-                data[name] = info
-            else:
-                # Remove the entry from paths, so it isn't processed below
-                del paths[info['path']]
-        else:
-            data[name] = info
-
-    return data
-
-
-
-def run_pytest(package, test_path=None, add_test_file_dunder=False, verbose=False):
-    pypi_name = package.pypi_name
-    mod_name = package.mod_name
-    version = package.version
-    excludes = package.test_ignores
-
-    if verbose:
-        print('run_pytest {} {} {}'.format(pypi_name, mod_name, version))
-
-    import pytest
-
-    if not package._mod_is_default:
-        mod = aggressive_import(mod_name)
-    else:
-        try:
-            mod = aggressive_import(pypi_name)
-        except Exception as e:
-            if verbose:
-                print("aggressive_import {} failed: {!r}".format(pypi_name, e))
-            raise e
-        package.mod_name = mod_name = mod.__name__
-
-    if not version:
-        version = _find_version(mod, verbose=verbose)
-
-    print('\nrun_pytest {} {} {}'.format(pypi_name, mod_name, version))
-
-    if verbose:
-        if not package._mod_is_default:
-            print('{}({}) = {}'.format(pypi_name, mod_name, version))
-        else:
-            print('{} = {}'.format(pypi_name, version))
-
-    found_bases = []
-    hooks = []
-    for pattern in package_base_patterns:
-        package_base = pattern.format(
-           pypi_name=pypi_name, mod_name=mod_name, version=version, version_major=version[0] if isinstance(version, str) else None)
-        if os.path.isdir(package_base):
-            if verbose:
-                print('run_pytest found {}'.format(package_base))
-            found_bases.append(package_base)
-            if not test_path:
-                mod_path = mod_name.replace('.', '/')
-                test_path = _find_tests_under(package_base, mod_name)
-                add_test_file_dunder = True
-                if not test_path:
-                    test_path = _find_tests_under(package_base + mod_path + '/', mod_name)
-                    if test_path:
-                        test_path = mod_path + '/' + test_path
-                        add_test_file_dunder = test_path
-                if not test_path:
-                    test_path = _find_tests_under(package_base + mod_name + '-python/', mod_name)  # hypothesis
-                    if test_path:
-                        package_base += mod_name + '-python/'
-                        add_test_file_dunder = test_path
-                if not test_path:
-                    test_path = _find_tests_under(package_base + 'src/' + mod_path + '/', mod_name)
-                    if test_path:
-                        package_base += 'src/'
-                        test_path = mod_path + '/' + test_path
-                        add_test_file_dunder = test_path
-                if mod_name != mod_path:
-                    if not test_path:
-                        test_path = _find_tests_under(package_base + mod_name + '/', mod_name)
-                        if test_path:
-                            test_path = mod_name + '/' + test_path
-                            add_test_file_dunder = test_path
-                    if not test_path:
-                        test_path = _find_tests_under(package_base + 'src/' + mod_name + '/', mod_name)
-                        if test_path:
-                            package_base += 'src/'
-                            test_path = mod_name + '/' + test_path
-                            add_test_file_dunder = test_path
-                if not test_path:
-                    test_path = _find_tests_under(package_base + 'src/', mod_path)
-                    if test_path:
-                        package_base += 'src/'
-                        test_path = test_path
-                        add_test_file_dunder = test_path
-                if not test_path:  # kitchen
-                    test_path = _find_tests_under(package_base + mod_name + '3/', mod_name)
-                    if test_path:
-                        package_base += mod_name + '3/'
-                        test_path = test_path
-                        add_test_file_dunder = test_path
-                if not test_path:  # regex
-                    test_path = _find_tests_under(package_base + mod_name + '_3/' + mod_name + '/', mod_name)
-                    if test_path:
-                        package_base += mod_name + '_3/'
-                        test_path = mod_name + '/' + test_path
-                        add_test_file_dunder = test_path
-                if not test_path and verbose:
-                    print('Couldnt find tests under {}'.format(package_base))
-
-            if test_path:
-                break
-    else:
-        if found_bases:
-            return 'tests for {} not found in {!r}'.format(pypi_name, found_bases)
-        else:
-            return 'base for {} {} not found'.format(pypi_name, version)
-
-    if add_test_file_dunder:
-        if add_test_file_dunder is True:
-            add_test_file_dunder = mod_name + '/' + 'tests/'
-        add_test_file_dunder = add_test_file_dunder.replace('.py', '')
-        add_test_file_dunder = add_test_file_dunder.replace('/', '.')
-        if add_test_file_dunder.endswith('.'):
-            add_test_file_dunder = add_test_file_dunder[:-1]
-        if add_test_file_dunder not in not_tests:
-            #if verbose:
-            print('Adding __file__ for {} @ {}'.format(add_test_file_dunder, package_base))
-            hooks.append(add_external_file_dunder(package_base, [add_test_file_dunder]))
-
-    if mod_name == 'tornado':
-        hooks.append(add_external_file_dunder(package_base, ['tornado.testing']))
-
-    pytest_args = base_pytest_args.copy()
-    if test_path == 't/' or mod_name in ['billiard', 'vine']:
-        pytest_args.remove('-c/dev/null')
-    if mod_name == 'websockets':
-        pytest_args.remove('-Wignore')
-
-    if mod_name == 'ruamel.yaml':
-        pytest_args += ['--ignore', '_test/lib']
-
-    if excludes:
-        ignores = [item for item in excludes if item.endswith('/') or item.endswith('.py')]
-        excludes = [item for item in excludes if item not in ignores]
-        for item in ignores:
-            pytest_args.append('--ignore-glob=*' + item)
-
-    if excludes and '*' in excludes:
-        excludes.remove('*')
-
-    if excludes:
-        if len(excludes) == 1:
-            pytest_args += ['-k', 'not {}'.format(excludes[0])]
-        else:
-            pytest_args += ['-k', 'not ({})'.format(' or '.join(excludes))]
-
-    pytest_args.append('./' + test_path)
-
-    os.chdir(package_base)
-    print("Running {}-{} tests: {}> pytest {}".format(pypi_name, version, package_base, pytest_args))
-    rv = pytest.main(pytest_args)
-    for hook in hooks:
-        unregister_import_hook(hook)
-    return rv
-
-
-def remove_test_modules(verbose=False):
-    for name in sorted(sys.modules.keys()):
-        # utils is owned by pycparser
-        # case.pytest needs evicting otherwise vine fails
-        if name.startswith('test_') or name.endswith('_test') or name.startswith('test.') or name.startswith('t.') or name.startswith('tests.') or name in ['t', 'utils', 'linecache', 'test', 'tests', 'conftest', 'case.pytest'] or name.startswith('pytest') or name.startswith('_pytest') or name == 'py' or name.startswith('py.'):
-           if verbose:
-               print('removing imported {}'.format(name))
-           del sys.modules[name]
-
-    #backports.test.__file__
-    #sys.modules['test'] = backports.test
-    #sys.modules['test.support'] = backports.test.support
-    # vine fails without this>?
-    #import case.pytest
-
-    #assert 'tests' not in sys.modules
-    #print(sorted(sys.modules))
-    #import tests
-    #print(tests.__file__)
-    #assert 'kitchen3' not in tests.__file__
 
 
 test_results = {}
 
-
-def run_tests(packages, skip={}, quit_early=False, verbose=False):
-    cwd = os.getcwd()
-    sys_path = sys.path.copy()
-    for package in packages:
-        if verbose:
-            print('looking at {}'.format(package))
-        if package == ...:
-            test_results[package] = 'break due to `...`!'
-            break
-        if isinstance(package, str) and len(package) > 50:
-            print('skipping long string')
-            continue
-
-        if not isinstance(package, TestPackage):
-            package = TestPackage(package)
-
-        excludes = package.test_ignores
-
-        pypi_name = package.pypi_name
-
-        if pypi_name in no_load_packages or pypi_name.lower() in no_load_packages:
-            test_results[pypi_name] = 'load avoided'
-            continue
-
-        if pypi_name in skip or pypi_name.lower() in skip:
-            continue
-
-        if excludes and excludes[0] == '*' and (not ignore_star_test_ignore or len(excludes) == 1):
-            print('Skipping {}'.format(package))
-            rv = 0
-        else:
-            try:
-                rv = run_pytest(package)
-            except BaseException as e:
-                if quit_early:
-                    raise
-                rv = e
-
-        os.chdir(cwd)
-        sys.path[:] = sys_path
-
-        test_results[package] = rv
-
-        if rv and quit_early or isinstance(rv, KeyboardInterrupt):
-            if isinstance(rv, BaseException):
-                raise rv
-            sys.exit(rv)
-
-        # Avoid clashes in test module names, like test_pickle in multidict and yarl
-        # which causes pytest to fail
-        remove_test_modules(verbose=verbose)
-
-    pprint(test_results)
 
 
 # for Pyphen needs os.listdir hacked
@@ -1404,7 +744,7 @@ sys.modules['test.support'] = backports.test.support
 # TODO: add a hook system to setup test.support only
 # for specific packages
 #sys_modules_pre = set(sys.modules.copy())
-run_tests([regex_package], quit_early=quit_early)
+run_tests([regex_package], quit_early=quit_early, no_load_packages=no_load_packages)
 
 # todo evict all new modules after each job
 #sys_modules_post = set(sys.modules.copy())
@@ -1413,7 +753,9 @@ run_tests([regex_package], quit_early=quit_early)
 unregister_import_hook(h)
 
 remove_test_modules()
-run_tests(packages, quit_early=quit_early)
+test_results = run_tests(packages, quit_early=quit_early)
+
+pprint(test_results)
 
 packages.append(regex_package)
 
