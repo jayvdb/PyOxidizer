@@ -55,6 +55,7 @@ pub fn rename_init(
     };
 
     let mut out_object = write::Object::new(in_object.format(), in_object.architecture());
+    out_object.flags = in_object.flags();
 
     let mut out_sections = HashMap::new();
     for in_section in in_object.sections() {
@@ -72,6 +73,7 @@ pub fn rename_init(
         } else {
             out_section.set_data(in_section.uncompressed_data().into(), in_section.align());
         }
+        out_section.flags = in_section.flags();
         out_sections.insert(in_section.index(), section_id);
     }
 
