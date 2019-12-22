@@ -20,11 +20,11 @@ path = "src/lib.rs"
 [build-dependencies]
 vergen = "3"
 
-# Contains one fix needed for Windows
+# Contains many fixes
 [dependencies.object]
-git = "https://github.com/philipc/object.git"
-branch = "common"
-features = ["read", "std", "write"]
+git = "https://github.com/gimli-rs/object.git"
+branch = "master"
+features = ["read", "std", "write", "compression", "wasm"]
 
 [dependencies]
 byteorder = "1.2"
