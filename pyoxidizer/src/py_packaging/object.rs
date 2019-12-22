@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use object::{
-    write, Object, ObjectSection, RelocationTarget, SectionKind, SymbolKind, SymbolSection,
+    write, Object, ObjectSection, RelocationTarget, SectionKind, SymbolFlags, SymbolKind,
+    SymbolSection,
 };
 use slog::{info, warn};
 use std::collections::HashMap;
@@ -98,6 +99,21 @@ pub fn rename_init(
                 in_symbol.address() - in_object.section_by_index(index).unwrap().address(),
             ),
         };
+        let flags = match in_symbol.flags() {
+            SymbolFlags::None => SymbolFlags::None,
+            SymbolFlags::Elf { st_info, st_other } => SymbolFlags::Elf { st_info, st_other },
+            SymbolFlags::MachO { n_desc } => SymbolFlags::MachO { n_desc },
+            SymbolFlags::CoffSection {
+                selection,
+                associative_section,
+            } => {
+                let associative_section = *out_sections.get(&associative_section).unwrap();
+                SymbolFlags::CoffSection {
+                    selection,
+                    associative_section,
+                }
+            }
+        };
         let sym_name = if !in_sym_name.starts_with("$")
             && in_sym_name.contains("PyInit_")
             && !in_sym_name.contains(name_prefix)
@@ -123,6 +139,7 @@ pub fn rename_init(
             scope: in_symbol.scope(),
             weak: in_symbol.is_weak(),
             section,
+            flags,
         };
 
         let symbol_id = out_object.add_symbol(out_symbol);
