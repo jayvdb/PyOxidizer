@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use object::{write, Object, ObjectSection, RelocationTarget, SectionKind, SymbolKind};
+use object::{
+    write, Object, ObjectSection, RelocationTarget, SectionKind, SymbolFlags, SymbolKind,
+    SymbolSection,
+};
 use slog::{info, warn};
 use std::collections::HashMap;
 use std::error::Error;
@@ -96,6 +99,21 @@ pub fn rename_init(
             ),
             None => (None, in_symbol.address()),
         };
+        let flags = match in_symbol.flags() {
+            SymbolFlags::None => SymbolFlags::None,
+            SymbolFlags::Elf { st_info, st_other } => SymbolFlags::Elf { st_info, st_other },
+            SymbolFlags::MachO { n_desc } => SymbolFlags::MachO { n_desc },
+            SymbolFlags::CoffSection {
+                selection,
+                associative_section,
+            } => {
+                let associative_section = *out_sections.get(&associative_section).unwrap();
+                SymbolFlags::CoffSection {
+                    selection,
+                    associative_section,
+                }
+            }
+        };
         let sym_name = if !in_sym_name.starts_with("$")
             && in_sym_name.contains("PyInit_")
             && !in_sym_name.contains(name_prefix)
@@ -121,6 +139,7 @@ pub fn rename_init(
             scope: in_symbol.scope(),
             weak: in_symbol.is_weak(),
             section,
+            flags,
         };
 
         let symbol_id = out_object.add_symbol(out_symbol);
