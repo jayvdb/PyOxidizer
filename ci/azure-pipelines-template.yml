@@ -14,6 +14,12 @@ jobs:
         rustup_toolchain: 1.36.0
 
   steps:
+  - ${{ if eq(parameters.name, 'Windows') }}:
+    - powershell: |
+        git clone --branch fix-name 'https://github.com/jayvdb/Fudge'
+        .\Fudge\src\Fudge.ps1 install -adhoc openssl
+      displayName: 'Install OpenSSL'
+
   - ${{ if ne(parameters.name, 'Windows') }}:
     - script: |
         curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUSTUP_TOOLCHAIN
@@ -64,12 +70,6 @@ jobs:
         cargo run --bin pyoxidizer -- init --pip-install appdirs==1.4.3 --pip-install cryptography==2.8 --pip-install markupsafe==1.1.1 --pip-install simplejson==3.17.0 --pip-install gevent==1.4.0 ~/pyapp
         cat ci/pyapp.py | cargo run --bin pyoxidizer -- run ~/pyapp
       displayName: Build Oxidized Application
-
-  - ${{ if eq(parameters.name, 'Windows') }}:
-    - powershell: |
-        git clone 'https://github.com/Badgerati/Fudge'
-        .\Fudge\src\Fudge.ps1 install -adhoc openssl
-      displayName: 'Install OpenSSL'
 
   - ${{ if eq(parameters.name, 'Windows') }}:
     - task: UsePythonVersion@0
