@@ -11,16 +11,18 @@ import sys
 def _get_build_info():
     build_apps_dir = str(os.path.join('build', 'apps')) + os.path.sep
     assert build_apps_dir in sys.executable
-    build_dir, _, suffix = sys.executable.partition(build_apps_dir)
+    project_dir, _, suffix = sys.executable.partition(build_apps_dir)
+    print(project_dir, _, suffix)
     suffix_parts = suffix.split(os.path.sep)
     assert len(suffix_parts) == 4
     assert suffix_parts[0] == suffix_parts[-1]
     app_name, rust_target_id, build_type = suffix_parts[:-1]
-    return build_dir, app_name, rust_target_id, build_type
+    return project_dir, app_name, rust_target_id, build_type
 
 def _get_dist_root():
-    build_dir, app_name, rust_target_id, build_type = _get_build_info()
-    dist_root = os.path.join(build_dir, 'target', rust_target_id, build_type,
+    project_dir, app_name, rust_target_id, build_type = _get_build_info()
+    print(project_dir, app_name, rust_target_id, build_type)
+    dist_root = os.path.join(project_dir, 'build', 'target', rust_target_id, build_type,
                              'pyoxidizer', 'python.608871543e6d', 'python', 'install')
     return dist_root
 
@@ -40,6 +42,13 @@ sys._home = dist_root
 # correct paths, esp Python.h
 sys.base_exec_prefix = sys.exec_prefix = sys.base_prefix = sys.prefix = dist_root
 
+
+from distutils.sysconfig import get_python_lib  # used to determine stdlib
+
+print('stdlib', get_python_lib(standard_lib=True))
+lib2to3_dir = os.path.join(get_python_lib(standard_lib=True), 'lib2to3')
+assert os.path.isdir(lib2to3_dir), '{} does not exist'.format(lib2to3_dir)
+#sys.exit(1)
 
 from import_hooks import (
     add_import_error,
@@ -71,6 +80,10 @@ from xot import (
     _is_std_lib,
     remove_test_modules,
 )
+
+#from xot import _pytest_runner
+#_pytest_runner.ignore_star_test_ignore = True
+
 
 set_package_base_patterns([
     '/home/jayvdb/projects/osc/home:jayvdb:branches:devel:languages:python/python-{pypi_name}/{pypi_name}-{version}/',
@@ -347,7 +360,7 @@ packages = [
     TestPackage('python-dotenv', ['test_cli.py', 'test_core.py']), #==0.10.2 depends on unix only `sh`
     TestPackage('fastimport'), # ==0.9.8
 
-    #...,
+    ...,
 
     TestPackage('PyNaCl', [
         # '*',
