@@ -575,4 +575,20 @@ mod tests {
             assert!(x.module.is_package);
         });
     }
+
+    #[test]
+    fn test_pip_install_gevent() {
+        let resources =
+            starlark_ok("default_python_distribution().pip_install(['--no-binary', ':all:', 'gevent'], extra_envs={'PIP_VERBOSE': '1'})");
+        assert_eq!(resources.get_type(), "list");
+
+        let mut it = resources.into_iter().unwrap();
+
+        let v = it.next().unwrap();
+        assert_eq!(v.get_type(), "PythonSourceModule");
+        v.downcast_apply(|x: &PythonSourceModule| {
+            assert_eq!(x.module.name, "gevent");
+            assert!(x.module.is_package);
+        });
+    }
 }
