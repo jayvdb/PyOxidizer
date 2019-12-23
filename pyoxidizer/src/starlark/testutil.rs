@@ -16,7 +16,7 @@ use crate::logging::PrintlnDrain;
 pub fn starlark_env() -> Environment {
     let logger = slog::Logger::root(
         PrintlnDrain {
-            min_level: slog::Level::Error,
+            min_level: slog::Level::Info,
         }
         .fuse(),
         slog::o!(),
