@@ -20,6 +20,7 @@ use crate::py_packaging::distribution::ExtensionModule;
 use crate::py_packaging::embedded_resource::EmbeddedPythonResourcesPrePackaged;
 use crate::py_packaging::resource::{
     BytecodeModule, BytecodeOptimizationLevel, PythonResource, ResourceData, SourceModule,
+    BuiltExtensionModule,
 };
 
 #[derive(Debug, Clone)]
@@ -215,6 +216,62 @@ impl TypedValue for PythonResourceData {
     }
 }
 
+
+#[derive(Debug, Clone)]
+pub struct PythonBuiltExtensionModule {
+    pub em: BuiltExtensionModule,
+}
+
+impl TypedValue for PythonBuiltExtensionModule {
+    immutable!();
+    any!();
+    not_supported!(
+        binop, dir_attr, function, get_hash, indexable, iterable, sequence, set_attr, to_int
+    );
+
+    fn to_str(&self) -> String {
+        format!("PythonExtensionModule<name={}>", self.em.name)
+    }
+
+    fn to_repr(&self) -> String {
+        self.to_str()
+    }
+
+    fn get_type(&self) -> &'static str {
+        "PythonBuiltExtensionModule"
+    }
+
+    fn to_bool(&self) -> bool {
+        true
+    }
+
+    fn compare(&self, other: &dyn TypedValue, _recursion: u32) -> Result<Ordering, ValueError> {
+        default_compare(self, other)
+    }
+
+    fn get_attr(&self, attribute: &str) -> ValueResult {
+        let v = match attribute {
+            "name" => Value::new(self.em.name.clone()),
+            attr => {
+                return Err(ValueError::OperationNotSupported {
+                    op: format!(".{}", attr),
+                    left: "PythonBuiltExtensionModule".to_string(),
+                    right: None,
+                })
+            }
+        };
+
+        Ok(v)
+    }
+
+    fn has_attr(&self, attribute: &str) -> Result<bool, ValueError> {
+        Ok(match attribute {
+            "name" => true,
+            _ => false,
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PythonExtensionModule {
     pub em: ExtensionModule,
@@ -353,9 +410,7 @@ impl<'a> From<&'a PythonResource> for Value {
                 panic!("not yet implemented");
             }
 
-            PythonResource::BuiltExtensionModule(_em) => {
-                panic!("not yet implemented");
-            }
+            PythonResource::BuiltExtensionModule(em) => Value::new(PythonBuiltExtensionModule { em: em.clone() }),
         }
     }
 }
