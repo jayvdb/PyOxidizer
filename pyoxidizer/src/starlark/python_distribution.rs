@@ -576,6 +576,7 @@ mod tests {
         });
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_pip_install_gevent() {
         let resources =
