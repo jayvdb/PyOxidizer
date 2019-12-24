@@ -19,8 +19,8 @@ padme
 bson==0.5.8
 backcall==0.1.0
 blinker==1.4
-colorclass==2.2.0
-docrepr==0.1.1
+#colorclass==2.2.0
+#docrepr==0.1.1
 python-dotenv==0.10.2
 fastimport==0.9.8
 

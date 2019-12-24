@@ -1,5 +1,5 @@
-run_all = False
 quit_early = False
+skip_slow = True
 
 from pprint import pprint
 import os
@@ -81,10 +81,6 @@ from xot import (
     remove_test_modules,
 )
 
-#from xot import _pytest_runner
-#_pytest_runner.ignore_star_test_ignore = True
-
-
 set_package_base_patterns([
     '/home/jayvdb/projects/osc/home:jayvdb:branches:devel:languages:python/python-{pypi_name}/{pypi_name}-{version}/',
     '/home/jayvdb/projects/osc/d-l-py/python-{pypi_name}/{pypi_name}-{version}/',
@@ -157,7 +153,6 @@ empty_load_packages = [
 
     'sentry_sdk',  # breaks dns
     # 'pyx',  # blows up
-    'webbrowser', # grrrr
     #'pyglet',
     'eventlet',
     'jsonrpcclient.__main__',
@@ -165,10 +160,11 @@ empty_load_packages = [
     'tinycss2', 'pyphen', 'phabricator',
 
     # stdlib problems
-    'this',
-    'macpath',
-    'formatter',
     'antigravity',
+    'formatter',
+    'macpath',
+    'webbrowser', # grrrr
+    'this',
 ]
 
 add_empty_load(empty_load_packages)
@@ -203,6 +199,7 @@ print(networkx.algorithms.tree.recognition.__spec__)
 
 add_junk_file_dunder([
     'hashid',
+    'soupsieve.util',
 ], is_module=True)
 
 
@@ -246,7 +243,11 @@ add_file_dunder_during(ext_stdlib_root, 'hypothesis', 'os')
 
 assert sys.oxidized
 pyox_finder = sys.meta_path[0]
-_pyox_modules = list(pyox_finder.package_list())
+_pyox_modules = sorted(pyox_finder.package_list())
+
+# These should be True
+assert 'nacl._sodium' in _pyox_modules
+assert '_sodium' not in _pyox_modules
 
 # pyox_finder.__spec__.__module__ = None
 
@@ -283,13 +284,30 @@ regex_package = TestPackage('regex', [
 
 
 packages = [
+    #TestPackage('click-help-colors', version='0.6'),  # has tests in master, but incompatible with 0.6  ModuleNotFoundError("No module named 'click.help'")
+    #TestPackage('stdlib-list'),
+
+    TestPackage('soupsieve'),  #  fix upstream: File "soupsieve.util", line 9, in <module>: NameError: name '__file__' is not defined
+    TestPackage('beautifulsoup4', [
+        'test_html5lib.py', 'test_lxml.py',  # py2 syntax
+        'TestWarnings', 'test_custom_builder_class',  # side-effect of disabling warnings
+        'test_smart_quote_substitution',
+        'test_ascii_in_unicode_out',  # 'unicode' not defined
+        'test_extract_multiples_of_same_tag',
+        'test_deprecated_member_access',
+        'test_copy_preserves_encoding',
+        'test_copy_tag_copies_contents',
+        'test_prettify_outputs_unicode_by_default',
+    ], mod_name='bs4'),  # NameError("name '__file__' is not defined")}
+    # ...,
+    TestPackage('chardet'),
+
     TestPackage('pyelftools', [  # uses 'test/' so is good to place early to ensure no cpython `test` problems
         'run_examples_test.py',  # ImportError: cannot import name 'run_exe' from 'utils' (unknown location)
         # probably need to de-import 'utils' loaded from another package test suite
     ]),
 
     TestPackage('tornado', test_ignores=[
-        '*',
         'TestIOStreamWebMixin', 'TestReadWriteMixin', 'TestIOStreamMixin',
         'AutoreloadTest', 'GenCoroutineTest', 'HTTPServerRawTest', 'UnixSocketTest', 'BodyLimitsTest', 'TestIOLoopConfiguration', 'TestIOStream', 'TestIOStreamSSL', 'TestIOStreamSSLContext', 'TestPipeIOStream',
         'LoggingOptionTest',
@@ -297,6 +315,17 @@ packages = [
         'simple_httpclient_test',  # a few failures
         'test_error_line_number_extends_sub_error',
     ]),  # lots of failures
+
+    TestPackage('logutils', ['test_hashandlers', 'RedisQueueTest']),  # unknown
+    TestPackage('Flask', [
+        'test_scriptinfo',  # fails if directory contains ':'
+        'test_main_module_paths',
+        'test_installed_module_paths', #[False]',
+        'test_installed_package_paths', #[False]',
+        'test_prefix_package_paths',  #[False]',
+        'test_egg_installed_paths',
+        'test_aborting',
+    ]),
 
     #...,
     TestPackage('pycountry', [
@@ -317,15 +346,12 @@ packages = [
     TestPackage('websocket-client', mod_name='websocket'),
     TestPackage('websockets'),  # opensuse outdated
 
-    TestPackage('setuptools', [  # outdated
-    ], other_mods=['easy_install', 'pkg_resources']),  # mostly not useful within PyOxidizer, esp without pip, however pkg_resources is very important
-    #TestPackage('html5lib', [
-    #    'test_stream.py',
-    #    'testdata/',
-    #]), # ==1.0.1
-    TestPackage('humanize', ['*']), # ==0.4  __file__
+    TestPackage('html5lib', [
+        'test_stream.py',
+        'testdata/',
+    ]), # ==1.0.1
+    # TODO: not built in?
     TestPackage('hypothesis', [
-        '*',
         'django/', 'numpy/', 'pandas/', 'py2/', 'dpcontracts/',
         'pytest/',
         'py3/test_lookup_py38.py',
@@ -336,7 +362,6 @@ packages = [
         'TestMemcache',  # needs running memcached
     ], mod_name='memcache'), # ==1.58
     TestPackage('python-mimeparse'), # ==1.6.0  ln -s mimeparse_test.py python_mimeparse_test.py
-    TestPackage('rfc3987'), # ==1.3.8  # use -- doctest
     TestPackage('u-msgpack-python'), # ==2.5.1
     TestPackage('strict-rfc3339', version='0.7'),  # ln -s strict-rfc3339-version-0.7 strict-rfc3339-0.7
 
@@ -352,18 +377,16 @@ packages = [
     TestPackage('atomicwrites'), # ==1.3.0
     TestPackage('iso8601', version='0.1.12'),  # /usr/lib/python3.7/site-packages/iso8601/
 
-    TestPackage('bson', version='0.5.8'), #==0.5.8  # "bson.tests", line 8, in <module> NameError: name '__file__' is not defined
     TestPackage('backcall'), #==0.1.0
     TestPackage('blinker'), #==1.4
-    TestPackage('colorclass', ['*']), #==2.2.0  has no tests
-    TestPackage('docrepr', ['*']), #==0.1.1  has no tests
     TestPackage('python-dotenv', ['test_cli.py', 'test_core.py']), #==0.10.2 depends on unix only `sh`
     TestPackage('fastimport'), # ==0.9.8
 
-    ...,
+    TestPackage('imagesize', version='1.1.0'),
+
+    #...,
 
     TestPackage('PyNaCl', [
-        # '*',
         'test_bindings.py', 'test_box.py',  # binary() got an unexpected keyword argument 'average_size'
         'test_wrong_types',  # pytest5 incompatibility
     ], other_mods=['nacl', '_sodium']),
@@ -375,12 +398,10 @@ packages = [
     TestPackage('pyparsing'),
     TestPackage('unicodedata2'),
 
-    TestPackage('ruamel.std.pathlib', ['*']),  # no tests?
     TestPackage('ruamel.yaml', [
         'test_collections_deprecation',
     ], other_mods=['_ruamel_yaml']),  # upstream issue
     TestPackage('psutil', [
-        '*',
         'test_process', 'TestProcessUtils', 'TestScripts', 'TestTerminatedProcessLeaks', 'test_multi_sockets_proc', 'test_memory_leaks',  # sys.executable
         'test_pid_exists', 'test_wait_procs', 'test_wait_procs_no_timeout', 'test_proc_environ',  # subprocess
         'test_warnings_on_misses', 'test_missing_sin_sout', 'test_no_vmstat_mocked',  # filename issues
@@ -395,7 +416,6 @@ packages = [
         'test_memory_info_ex',   # side effect of -Wignore
     ]),
     TestPackage('cffi', [
-        '*',
         'TestBitfield', 'test_verify', 'TestDistUtilsCPython',  # loads built extension dynamically
         'TestZIntegration',  # popen
         'cffi0/test_vgen.py', 'cffi0/test_vgen2.py',  # lots of error
@@ -411,7 +431,6 @@ packages = [
         'test_compressed_data_with_dictionaries',  # removed functionality in brotli 1.x
     ]),
     TestPackage('urllib3', [
-        '*',
         'contrib/', 'with_dummyserver/', 'test_connectionpool.py', # requires tornado
         'test_cannot_import_ssl',  # probably oxidization makes test impossible
         'test_disable_warnings',  # side-effect of -Wignore
@@ -427,10 +446,7 @@ packages = [
     TestPackage('pycparser', [
         'test_c_generator.py', 'test_c_parser.py',  # inspect.getfile fails
     ], other_mods=['utils']),
-    TestPackage('certifi', ['*']),  # has no tests
-    TestPackage('pip', ['*']),  # completely broken, starting with __file__
     TestPackage('cryptography', [
-        '*',
         'test_vector_version',  # ignore mismatch of cryptography master vs vectors released
         'test_osrandom_engine_is_default',  # uses python -c
         'TestAssertNoMemoryLeaks',  # test_openssl_memleak is skipped on openSUSE
@@ -438,34 +454,27 @@ packages = [
         'test_aware_not_valid_after', 'test_aware_not_valid_before', 'test_aware_last_update', 'test_aware_next_update', 'test_aware_revocation_date',  #pytz problems
     ]),
     TestPackage('requests', [
-        '*',
         'test_errors', # 2/4 "test_errors" fail, which is problematic
         'test_https_warnings',  # this one is problematic
         'TestTimeout',
         'test_proxy_error',
+        'test_redirecting_to_bad_url', 'TestGetEnvironProxies', 'test_set_environ',  # recent additions caused by some other package
         # https://github.com/psf/requests/pull/5251
         'test_rewind_body_failed_tell', 'test_rewind_body_no_seek', 'test_conflicting_post_params', 'test_proxy_error'  # pytest compatibility
     ]),
     TestPackage('MarkupSafe'),
     TestPackage('idna'),
-    TestPackage('chardet', ['*']),
 
-    TestPackage('PyYAML', mod_name='yaml', other_mods=['_yaml'], test_ignores=['*']),  # tests incompatible with pytest, and need test DSOs which cant be loaded
-
-    TestPackage('test-server', test_ignores=['*']),  # AttributeError: module 'tornado.web' has no attribute 'asynchronous'
-    TestPackage('PySocks', mod_name='socks', other_mods=['sockshandler'], test_ignores=['*']),  # requires test_server
 
     # not listed
 
 
-    TestPackage('importlib-metadata', ['test_zip']),
     TestPackage('jsonschema', [
         'test_cli.py',
         'test_jsonschema_test_suite.py',  # requires data set
         'test_validators.py',  # ImportError: cannot import name 'RefResolutionError' from 'jsonschema.validators'
         'test_repr',
     ]),
-    TestPackage('logutils', ['test_hashandlers', 'RedisQueueTest']),  # unknown
     TestPackage('botocore', [  # supposed to use nose test runner
         'test_client_method_help', 'test_paginator_help_from_client', 'test_waiter_help_documentation',  # help() not included in PyOxidizer
         'test_dynamic_client_error', 'test_s3_special_case_is_before_other_retry', 'test_s3_addressing', 'TestCreateClient', 'TestClientMonitoring', 'TestSessionPartitionFiles', 'TestGenerateDBAuthToken', 'test_internal_endpoint_resolver_is_same_as_deprecated_public', # botocore.session:160: in create_default_resolver botocore.loaders:132: in _wrapper  botocore.exceptions.DataNotFoundError: Unable to load data for: endpoints
@@ -480,10 +489,6 @@ packages = [
         'test_flexmock_preserves_stubbed_object_methods_between_tests',
         'test_flexmock_removes_new_stubs_from_classes_after_tests',
     ]),
-    TestPackage('virtualenv', [
-        '*',  # ImportError: cannot import name '__file__' from 'virtualenv_support'
-        # also 'test_cmdline',
-    ], other_mods=['virtualenv_support']),
     TestPackage('Werkzeug', [
         'test_no_memory_leak_from_Rule_builder', 'test_find_modules',
         'test_debug.py', 'test_serving.py',   # hang somewhere in here
@@ -512,17 +517,7 @@ packages = [
     TestPackage('ptyprocess'),
     TestPackage('rfc3986'),
     TestPackage('colorama', ['testInitDoesntWrapOnEmulatedWindows', 'testInitDoesntWrapOnNonWindows']),
-    TestPackage('Flask', [
-        'test_scriptinfo',  # fails if directory contains ':'
-        'test_main_module_paths',
-        'test_installed_module_paths', #[False]',
-        'test_installed_package_paths', #[False]',
-        'test_prefix_package_paths',  #[False]',
-        'test_egg_installed_paths',
-        'test_aborting',
-    ]),
     TestPackage('attrs', [
-        '*',
         'test_multiple_empty',  # inspect.getsource failed
     ], mod_name='attr'),
     TestPackage('click-spinner'),
@@ -539,7 +534,6 @@ packages = [
     TestPackage('orderedmultidict'),  # v1.0.1 needs __file__ to supply __version__
     TestPackage('dparse', ['test_update_pipfile']),
     TestPackage('pluggy'),
-    TestPackage('userpath', ['*']),  # requires pytest run inside tox
     TestPackage('pyserial'),
     TestPackage('pathspec'),
     TestPackage('pyperclip', ['TestKlipper']),  # KDE service
@@ -550,14 +544,12 @@ packages = [
     # opensuse outdated
     TestPackage('pyxattr'),
     TestPackage('dulwich', [
-        '*',
         'test_blackbox', 'GitReceivePackTests', 'test_missing_arg',  # subprocess
         'test_iterblobs',  # side-effect of -Wignore
     ]),
     TestPackage('yarl'),
     TestPackage('multidict'),
     TestPackage('aiohttp', [
-        '*',
         'test_aiohttp_request_coroutine', # [pyloop]
         'test_client_fingerprint.py',  # ssl = pytest.importorskip('ssl'): KeyError: 'ssl'
         'test_warning_checks',  # ValueError: Pytest terminal summary report not found
@@ -568,7 +560,6 @@ packages = [
         'test_aiohttp_plugin_async_gen_fixture', 'test_aiohttp_plugin_async_fixture',  # not important
     ]),
     TestPackage('future', [
-        '*',
         'test_requests',  # halts
         'test_futurize',  # mostly failing, probably sys.executable
         'test_mixed_annotations', 'test_multiple_param_annotations',  # sys.executable
@@ -587,8 +578,8 @@ packages = [
     TestPackage('zstd', ['test_version']),  # outdated
     TestPackage('pytz'),  # opensuse outdated  pytz:95: in open_resource  NameError: name '__file__' is not defined
     TestPackage('xxhash'),  # outdated
+
     TestPackage('SQLAlchemy', [
-        '*',
         'aaa_profiling',  # unnecessary and slow
         # should be QueryTest_sqlite+pysqlite_3_30_1.test_order_by_nulls :
         'QueryTest_sqlite',  # AssertionError: Unexpected success for 'test_order_by_nulls' (not postgresql and not oracle and not firebird)
@@ -609,7 +600,6 @@ packages = [
     TestPackage('wcwidth', version='0.1.7'),
     TestPackage('isodate', version='0.6.0'),
     TestPackage('lark-parser', [
-        '*',
         'test_tools', 'TestStandalone', 'TestNearley',  # sys.executable / __file__
     ], mod_name='lark', version='0.7.7'),
     TestPackage('httmock', version='1.3.0'),
@@ -633,14 +623,6 @@ packages = [
     TestPackage('typed-ast'),  # ln -s typed_ast-1.4.0 typed-ast-1.4.0
     TestPackage('text-unidecode', version='1.3'),  # ln -s test_unidecode.py test_text_unidecode.py
 
-    # no tests
-    #TestPackage('certstream', ['*'], version='1.10'),  # https://github.com/CaliDog/certstream-python/issues/29
-    #TestPackage('click-completion', ['*']),  # outdated
-    #TestPackage('mulpyplexer', ['*'], version='0.08'),
-    #TestPackage('click-help-colors', ['*'], version='0.6'),  # has tests in master, but incompatible with 0.6
-    #TestPackage('hashID', ['*'], mod_name='hashid'),  # no tests, but broken https://github.com/psypanda/hashID/issues/47
-    #TestPackage('stdlib-list', ['*']),
-    #TestPackage('termcolor', ['*']),
 
     # substantial failures; pytz
     TestPackage('Pygments', [
@@ -651,7 +633,6 @@ packages = [
         'testBrokenUnquotedString',  # praat
     ]),
     TestPackage('lz4', [
-        '*',
         'test_roundtrip_1',  # concerning - should be isolated with further at least test_roundtrip_1[data1-4-True-True-True-0-store_size0]),  # outdated
     ]),
     TestPackage('python-whois', [
@@ -676,7 +657,6 @@ packages = [
     TestPackage('pyrsistent', other_mods=['_pyrsistent_version', 'pvectorc'], version='0.15.4'),  # TODO: get version?
 
     # late additions
-    TestPackage('soupsieve', ['*']),  # File "soupsieve.util", line 9, in <module>: NameError: name '__file__' is not defined
     TestPackage('waitress', [
         'test_functional.py',  # hangs
         'TestAPI_UseIPv4Sockets', 'TestAPI_UseIPv6Sockets',
@@ -685,13 +665,8 @@ packages = [
     TestPackage('WebOb', [
         'test_update_behavior_warning',  # side-effect of -Wignore
     ], version='1.8.5'),
-    TestPackage('WebTest', ['*'], mod_name='webtest'),  # __file__
-    TestPackage('xmlschema', ['*']),  # __file__
-    TestPackage('yaspin', ['*']),  # __file__
-    TestPackage('netaddr', ['*']),  # __file__
     TestPackage('more-itertools', ['SetPartitionsTests'], version='7.2.0'),
     TestPackage('packaging', [
-        '*',
         'test_invalid_url', 'test_parseexception_error_msg',  # pytest5 incompatibility
         'test_cpython_abi_py3', 'test_cpython_abi_py2', 'test_cpython_tags', 'test_sys_tags_on_mac_cpython', 'test_sys_tags_on_windows_cpython', 'test_sys_tags_linux_cpython',  # AttributeError: module 'packaging.tags' has no attribute '_cpython_abi'
         'test_check_glibc_version_warning',  # side-effect of -Wignore
@@ -700,7 +675,6 @@ packages = [
         'test_catch_warnings', 'test_capture_stderr_warn',  # pytest arg incompat
     ]),
 
-    TestPackage('bottle', ['*']),  # NameError("name '__file__' is not defined")}
     TestPackage('distro', [
         'TestCli',
         'TestLSBRelease',
@@ -709,7 +683,6 @@ packages = [
         'TestGetAttr',
         'TestInfo',
     ]),  #  ln -s distro-1.4.0 distro-20190617
-    TestPackage('docutils', ['*']),  # test collection problem
     TestPackage('elementpath', [
         'test_schema_proxy.py',  # xmlschema.codepoints:562: in build_unicode_categories: NameError: name '__file__' is not defined
     ]),
@@ -719,23 +692,100 @@ packages = [
         'test_query_txt_multiple_chunked', 'test_result_not_ascii',
         'test_query_any', 'test_query_mx', 'test_query_ns',
     ], other_mods=['_cares']),
-    TestPackage('beautifulsoup4', ['*'], mod_name='bs4'),  # NameError("name '__file__' is not defined")}
-    TestPackage('cmd2', ['*']),  # AttributeError("module 'docutils.parsers.rst.states' has no attribute '__file__'")}
+]
+
+untestable = [
+    # TODO
+    TestPackage('importlib-metadata', ['test_zip']),  # wrong version being installed
     TestPackage('click-didyoumean', ['*']),  # all broken, not investigated
 
+    TestPackage('tqdm', [
+        '*',  # Tests are not collecting
+    ], version='4.40.2'),
+    TestPackage('setuptools', [
+        '*',  # Tests are not collecting
+    ], other_mods=['easy_install', 'pkg_resources']),  # mostly not useful within PyOxidizer, esp without pip, however pkg_resources is very important
+    TestPackage('bson', version='0.5.8'), #==0.5.8  # "bson.tests", line 8, in <module> NameError: name '__file__' is not defined
+
+    # Test runner problems
+    TestPackage('userpath', ['*']),  # requires pytest run inside tox
+    TestPackage('PyYAML', mod_name='yaml', other_mods=['_yaml'], test_ignores=['*']),  # tests incompatible with pytest, and need test DSOs which cant be loaded
+    TestPackage('docutils', ['*']),  # test collection problem, also see cmd2
+    TestPackage('rfc3987', ['*']), # Only has doctests, and pytest requires __file__ for loading doctest
+
+    TestPackage('test-server', test_ignores=['*']),  # AttributeError: module 'tornado.web' has no attribute 'asynchronous'
+    TestPackage('PySocks', mod_name='socks', other_mods=['sockshandler'], test_ignores=['*']),  # requires test_server
+
+    # __file__ problems
+    TestPackage('humanize', ['*']), # ==0.4  __file__
+    TestPackage('WebTest', ['*'], mod_name='webtest'),  # __file__
+    TestPackage('xmlschema', ['*']),  # __file__
+    TestPackage('yaspin', ['*']),  # __file__
+    TestPackage('netaddr', ['*']),  # __file__
+    TestPackage('bottle', ['*']),  # NameError("name '__file__' is not defined")}
+    TestPackage('pip', ['*']),  # completely broken, starting with __file__
+    TestPackage('cmd2', ['*']),  # AttributeError("module 'docutils.parsers.rst.states' has no attribute '__file__'")}
+    TestPackage('virtualenv', [
+        '*',  # ImportError: cannot import name '__file__' from 'virtualenv_support'
+        # also 'test_cmdline',
+    ], other_mods=['virtualenv_support']),
+    TestPackage('Babel', ['*'], mod_name='babel'),  # __file__
+    TestPackage('Sphinx', ['*'], mod_name='sphinx'),  # __file__
+    TestPackage('alabaster', ['*'], version='0.7.12'),  # todo: remove version and fix version finder
+    TestPackage('sphinxcontrib.applehelp', ['*']),  # broken because of Sphinx
+    TestPackage('sphinxcontrib.devhelp', ['*']),  # broken because of Sphinx
+    TestPackage('sphinxcontrib.htmlhelp', ['*']),  # broken because of Sphinx
+    TestPackage('sphinxcontrib.jsmath', ['*']),  # broken because of Sphinx
+    TestPackage('sphinxcontrib.qthelp', ['*']),  # broken because of Sphinx
+    TestPackage('sphinxcontrib.serializinghtml', ['*']),  # broken because of Sphinx
+
+    # no tests
+    TestPackage('ruamel.std.pathlib', ['*']),  # no tests?  Needed by ruamel.yaml
+    TestPackage('certifi', ['*']),  # has no tests
+
+    #TestPackage('certstream', ['*'], version='1.10'),  # https://github.com/CaliDog/certstream-python/issues/29
+    #TestPackage('click-completion', ['*']),  # outdated
+    #TestPackage('mulpyplexer', ['*'], version='0.08'),
+    #TestPackage('hashID', ['*'], mod_name='hashid'),  # no tests, but broken https://github.com/psypanda/hashID/issues/47
+    #TestPackage('termcolor', ['*']),
+    TestPackage('colorclass', ['*']), #==2.2.0  has no tests
+    TestPackage('docrepr', ['*']), #==0.1.1  has no tests
+    TestPackage('snowballstemmer', ['*'], version='2.0.0'),  # no tests available
 ]
+
+slow_test_suites = [
+    'chardet',
+    'tornado',
+    'html5lib',
+    'PyNaCl',
+    'psutil',
+    'cffi',
+    'urllib3',
+    'cryptography',
+    'requests',
+    'attrs',
+    'dulwich',
+    'aiohttp',
+    'future',
+    'SQLAlchemy',
+    'lark-parser',
+    'lz4',
+    'packaging',
+    'hypothesis',
+]
+
+skip_packages = no_load_packages.copy()
+if skip_slow:
+    skip_packages += slow_test_suites
 
 # psutil expects TRAVIS to signal deactivating unstable tests
 os.environ['TRAVIS'] = '1'
 
 package_names = []
-for package in packages:
-    if isinstance(package, TestPackage):
-       package_names.append(package.pypi_name)
+#for package in packages:
+#    if isinstance(package, TestPackage):
+#       package_names.append(package.pypi_name)
 
-namespace_packages = {package.pypi_name.split('.')[0] for package in packages if isinstance(package, TestPackage) and '.' in package.pypi_name}
-
-#print(namespace_packages)
 
 # Create requirements file
 #package_names = sorted(package_names)
@@ -757,7 +807,10 @@ sys.modules['test.support'] = backports.test.support
 # TODO: add a hook system to setup test.support only
 # for specific packages
 #sys_modules_pre = set(sys.modules.copy())
-run_tests([regex_package], quit_early=quit_early, no_load_packages=no_load_packages)
+regex_test_result = run_tests(
+    [regex_package],
+    quit_early=quit_early,
+)
 
 # todo evict all new modules after each job
 #sys_modules_post = set(sys.modules.copy())
@@ -766,11 +819,39 @@ run_tests([regex_package], quit_early=quit_early, no_load_packages=no_load_packa
 unregister_import_hook(h)
 
 remove_test_modules()
-test_results = run_tests(packages, quit_early=quit_early)
 
-pprint(test_results)
+# Main test run
+# TODO: skipped packages are not resolved, so they appear as unknown
+#       if mod_name is not the same as pypi_name
+
+test_results = run_tests(
+    packages,
+    quit_early=quit_early,
+    skip_packages=skip_packages,
+)
 
 packages.append(regex_package)
+test_results[regex_package] = regex_test_result[regex_package]
+
+failures = {}
+# TODO: Assert that all tested packages are built into PyOxidizer
+for package, result in test_results.items():
+    if result:
+        failures[package] = result
+
+if failures:
+    print('Failures:')
+    for package, result in failures.items():
+        print(package, result)
+
+non_test_results = run_tests(untestable)
+
+pprint(non_test_results)
+
+for package, result in non_test_results.items():
+    test_results[package] = result
+    if not result:
+        print('Unexpected success:', package, result)
 
 """
 for package in packages:
@@ -791,18 +872,34 @@ for package in packages:
     test_results[package] = 0
 """
 
+packages += untestable
+
+namespace_packages = {package.pypi_name.rsplit('.', 1)[0] for package in packages if isinstance(package, TestPackage) and '.' in package.pypi_name}
+for package in namespace_packages.copy():
+    top_level = package.split('.')[0]
+    namespace_packages.add(top_level)
+
+
+namespace_packages.add('sphinxcontrib')
+print('Namespace packages: ', namespace_packages)
+
+assert 'repoze' in namespace_packages
+assert 'zope' in namespace_packages
+assert 'ruamel' in namespace_packages
+assert 'ruamel.std' in namespace_packages
 
 _pyox_packages = package_versions(_pyox_modules, standard_lib=False, namespace_packages=namespace_packages)
 
 assert 'repoze.lru' in _pyox_packages
 
-
-print('_pyox_packages:')
-pprint(_pyox_packages)
+#print('_pyox_packages:')
+#pprint(_pyox_packages)
 
 untested = []
 
 for mod, info in _pyox_packages.items():
+    if mod in namespace_packages:
+        continue
     for package in packages:
         if package == ...:
             continue
@@ -824,8 +921,12 @@ for mod, info in _pyox_packages.items():
             print(f'unlisted package {mod} wasnt tested:\n  {info}')
         untested.append(TestPackage(mod))
 
+assert TestPackage('repoze') not in untested
+
 for mod in sorted(_pyox_modules):
-    if _is_std_lib(mod, ext_stdlib_root):
+    if _is_std_lib(mod):
+        continue
+    if mod in namespace_packages:
         continue
     for package in packages:
         if package == ...:
@@ -839,11 +940,16 @@ for mod in sorted(_pyox_modules):
         else:
             untested.append(TestPackage(mod))
 
+assert TestPackage('repoze') not in untested
+
 for package in untested:
     print(f'{package} not known')
 if not untested:
     print('All packages tested')
 
+# TODO: _sodium should not be listed as a test dependency,
+# however `import nacl._sodium` also creates `_sodium` in sys.modules
+# Also occurs in 'real' python3
 test_dependencies = package_versions(standard_lib=False,
                                      namespace_packages=namespace_packages,
                                      exclude=_pyox_modules)
@@ -851,4 +957,12 @@ test_dependencies = package_versions(standard_lib=False,
 print('Test dependencies:')
 pprint(test_dependencies)
 
-sys.exit(not untested)
+sys.exit(not failures and not untested)
+
+# Error in atexit._run_exitfuncs:
+#Traceback (most recent call last):
+#  File "multiprocessing.util", line 277, in _run_finalizers
+#  File "multiprocessing.util", line 201, in __call__
+#  File "billiard.pool", line 1662, in _terminate_pool
+#  File "billiard.pool", line 1638, in _help_stuff_finish
+#KeyboardInterrupt

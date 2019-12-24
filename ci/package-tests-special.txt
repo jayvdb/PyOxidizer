@@ -28,3 +28,5 @@ simplejson
 
 # non-binary
 git+https://github.com/bskinn/stdio-mgr
+git+https://github.com/click-contrib/click-help-colors
+#git+https://github.com/jayvdb/python-stdlib-list@pkgdata#egg=stdlib-list
