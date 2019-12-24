@@ -209,7 +209,7 @@ overload_open(['lark.load_grammar', 'lark.tools.standalone'], is_module=True)
 overload_open(['pycountry', 'pycountry.db', 'stdlib_list.base'])
 
 # doesnt work:
-#import_hooks.redirect_get_data_resources_open_binary(['yaspin'], is_module=True)
+redirect_get_data_resources_open_binary(['yaspin.spinners'], is_module=True)
 
 #pytest.main(['-v', '-pno:django', '/home/jayvdb/projects/osc/d-l-py/python-mock/mock-2.0.0/mock/tests/__main__.py'])
 
@@ -284,6 +284,8 @@ regex_package = TestPackage('regex', [
 
 
 packages = [
+    # Important additions
+    #TestPackage('vistir'),
     #TestPackage('click-help-colors', version='0.6'),  # has tests in master, but incompatible with 0.6  ModuleNotFoundError("No module named 'click.help'")
     #TestPackage('stdlib-list'),
 
@@ -520,6 +522,7 @@ packages = [
     TestPackage('attrs', [
         'test_multiple_empty',  # inspect.getsource failed
     ], mod_name='attr'),
+    TestPackage('yaspin'),
     TestPackage('click-spinner'),
     TestPackage('emoji'),
     TestPackage('jsonpointer'),
@@ -717,10 +720,9 @@ untestable = [
     TestPackage('PySocks', mod_name='socks', other_mods=['sockshandler'], test_ignores=['*']),  # requires test_server
 
     # __file__ problems
-    TestPackage('humanize', ['*']), # ==0.4  __file__
+    TestPackage('humanize', ['*']), # ==0.4 humanize.i18n", line 11, in <module>: NameError: name '__file__' is not defined
     TestPackage('WebTest', ['*'], mod_name='webtest'),  # __file__
-    TestPackage('xmlschema', ['*']),  # __file__
-    TestPackage('yaspin', ['*']),  # __file__
+    TestPackage('xmlschema', ['*']),  # xmlschema.codepoints", line 562, in build_unicode_categories: NameError: name '__file__' is not defined
     TestPackage('netaddr', ['*']),  # __file__
     TestPackage('bottle', ['*']),  # NameError("name '__file__' is not defined")}
     TestPackage('pip', ['*']),  # completely broken, starting with __file__
@@ -773,6 +775,12 @@ slow_test_suites = [
     'packaging',
     'hypothesis',
 ]
+
+#import landinggear.command
+
+# fails in pip_shims->pip._vendor
+#landinggear.command.main('landinggear-output')
+#sys.exit(1)
 
 skip_packages = no_load_packages.copy()
 if skip_slow:
