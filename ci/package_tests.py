@@ -178,11 +178,12 @@ add_junk_file_dunder([
     'networkx.release', 'networkx.generators.atlas',
     'plumbum',
     'botocore', 'botocore.httpsession',
+    'pip', 'pip._vendor', 'pip._vendor.pep517.wrappers', 'pip._internal.utils.misc',
 ])
 
 
 add_after_import_hook(
-    ['certifi.core'],
+    ['certifi.core', 'pip._vendor.certifi.core'],
     certifi_where_hack,
 )
 
@@ -695,6 +696,32 @@ packages = [
         'test_query_txt_multiple_chunked', 'test_result_not_ascii',
         'test_query_any', 'test_query_mx', 'test_query_ns',
     ], other_mods=['_cares']),
+
+    TestPackage('pip', [
+        'tests/functional/', 'tests/lib/',  # test init problems
+        'test_pip_version_check',  # uses pkg_resources looking for pip
+        # trimming as per openSUSE
+        'network',
+        'test_config_file_venv_option',
+        'test_build_env_allow_only_one_install',
+        'test_build_env_requirements_check',
+        'test_build_env_overlay_prefix_has_priority',
+        'test_build_env_isolation',
+        # color log problems
+        'tests/unit/test_base_command.py', 'tests/unit/test_build_env.py', 'tests/unit/test_cache.py',
+        # failures
+        'test_broken_pipe_in_stderr_flush',
+        'test_environment_marker_extras',
+        'test_unhashed_deps_on_require_hashes',
+        'test_mismatched_versions',
+        'TestCallSubprocess',
+        'test_virtualenv_no_global',
+        # extra failures when pip is tested last
+        'test_str_to_display__decode_error',
+        'test_skip_invalid_wheel_link',
+        'test_format_with_timestamp',
+        'test_missing_PATH_env_treated_as_empty_PATH_env',
+    ]),
 ]
 
 untestable = [
@@ -725,7 +752,6 @@ untestable = [
     TestPackage('xmlschema', ['*']),  # xmlschema.codepoints", line 562, in build_unicode_categories: NameError: name '__file__' is not defined
     TestPackage('netaddr', ['*']),  # __file__
     TestPackage('bottle', ['*']),  # NameError("name '__file__' is not defined")}
-    TestPackage('pip', ['*']),  # completely broken, starting with __file__
     TestPackage('cmd2', ['*']),  # AttributeError("module 'docutils.parsers.rst.states' has no attribute '__file__'")}
     TestPackage('virtualenv', [
         '*',  # ImportError: cannot import name '__file__' from 'virtualenv_support'
@@ -776,10 +802,84 @@ slow_test_suites = [
     'hypothesis',
 ]
 
-#import landinggear.command
 
-# fails in pip_shims->pip._vendor
-#landinggear.command.main('landinggear-output')
+def parse_wheel_filename(filename):
+    """Parse python and platform according to PEP 427 for wheels."""
+
+    stripped_filename = filename.strip(".whl")
+    try:
+        proj, vers, build, pyvers, abi, platform = stripped_filename.split("-")
+    except ValueError:  # probably no build version available
+        proj, vers, pyvers, abi, platform = stripped_filename.split("-")
+        build = None
+
+    return proj, vers, build, pyvers, abi, platform
+
+
+def parse_sdist_filename(filename):
+    """Parse sdist."""
+    if filename.endswith(".zip"):
+        stripped_filename = filename[:-4]
+    elif filename.endswith(".tar.gz"):
+        stripped_filename = filename[:-7]
+    elif filename.endswith(".tar.bz2"):
+        stripped_filename = filename[:-8]
+    elif filename.endswith(".tar.xz"):
+        stripped_filename = filename[:-7]
+
+    ext = filename[len(stripped_filename):]
+
+    #assert '-' in stripped_filename, '{} unrecognised: {} '.format(filename, stripped_filename)
+    try:
+        proj, vers = stripped_filename.rsplit('-', 1)
+    except ValueError:
+        proj, vers = stripped_filename, None
+
+    return proj, vers, ext
+
+
+from landinggear.extract_packages import Extractor
+
+class MyExtractor(Extractor):
+
+    def __init__(self, package_dir, packages):
+        super().__init__(package_dir)
+        self._wanted = packages
+
+    def iter_caches(self):
+        for cached_package in super().iter_caches():
+            if cached_package.is_package:
+                filename = cached_package.package_filename
+                if filename.endswith('.whl'):
+                    bits = parse_wheel_filename(filename)
+                    proj, vers = bits[0], bits[1]
+                    ext = '.whl'
+                    continue
+                else:
+                    proj, vers, ext = parse_sdist_filename(filename)
+                if not vers:
+                    print('Invalid name {} {} {}'.format(cached_package.package_filename, proj, cached_package.filepath))
+                    continue
+                import distutils.version  # todo: move
+                try:
+                    verdata = distutils.version.LooseVersion(vers)
+                except Exception as e:
+                    print('Invalid version {} {} {}: {}'.format(cached_package.package_filename, vers, cached_package.filepath, e))
+                try:
+                    if not verdata.version[0]:
+                        if not verdata.version[1]:
+                            if not verdata.version[2]:
+                                print('Odd version {} {} {}: {!r}'.format(cached_package.package_filename, vers, cached_package.filepath, verdata))
+                except Exception as e:
+                    print('Invalid version {} {} {}: {}'.format(cached_package.package_filename, vers, cached_package.filepath, e))
+                for package in self._wanted:
+                    if package.pypi_name == proj:
+                        if vers == package.version:
+                            yield cached_package
+
+
+extractor = MyExtractor('landinggear-output', packages)
+#extractor.extract_packages()
 #sys.exit(1)
 
 skip_packages = no_load_packages.copy()
@@ -827,6 +927,13 @@ regex_test_result = run_tests(
 unregister_import_hook(h)
 
 remove_test_modules()
+
+# pip_shims & pip is needed for landinggear, but causes cached-property tests to fail
+del sys.modules['pip_shims']
+if 'pip' in sys.modules:
+    for m in sorted(sys.modules):
+        if m.startswith('pip'):
+            del sys.modules[m]
 
 # Main test run
 # TODO: skipped packages are not resolved, so they appear as unknown
