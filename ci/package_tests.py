@@ -303,7 +303,7 @@ packages = [
         'test_prettify_outputs_unicode_by_default',
     ], mod_name='bs4'),  # NameError("name '__file__' is not defined")}
     # ...,
-    TestPackage('chardet'),
+    TestPackage('chardet', pip_cache_file='git+https://github.com/chardet/chardet'),
 
     TestPackage('pyelftools', [  # uses 'test/' so is good to place early to ensure no cpython `test` problems
         'run_examples_test.py',  # ImportError: cannot import name 'run_exe' from 'utils' (unknown location)
@@ -541,7 +541,7 @@ packages = [
     TestPackage('pyserial'),
     TestPackage('pathspec'),
     TestPackage('pyperclip', ['TestKlipper']),  # KDE service
-    TestPackage('rdflib', ['test_module_names']),  # master, unreleased
+    TestPackage('rdflib', ['test_module_names'], pip_cache_file='git+https://github.com/RDFLib/rdflib'),  # master, unreleased
     TestPackage('ConfigUpdater', version='1.0.1'),
     TestPackage('itsdangerous'),
 
@@ -677,7 +677,7 @@ packages = [
     ]),
     TestPackage('stdio-mgr', [
         'test_catch_warnings', 'test_capture_stderr_warn',  # pytest arg incompat
-    ]),
+    ], pip_cache_file='git+https://github.com/bskinn/stdio-mgr'),
 
     TestPackage('distro', [
         'TestCli',
@@ -686,7 +686,7 @@ packages = [
         'TestOverall',
         'TestGetAttr',
         'TestInfo',
-    ]),  #  ln -s distro-1.4.0 distro-20190617
+    ], version='1.4.0'),  #  Fix upstream, code version says it is `20190617`
     TestPackage('elementpath', [
         'test_schema_proxy.py',  # xmlschema.codepoints:562: in build_unicode_categories: NameError: name '__file__' is not defined
     ]),
@@ -839,14 +839,49 @@ def parse_sdist_filename(filename):
 
 
 from landinggear.extract_packages import Extractor
+import glob
 
 class MyExtractor(Extractor):
 
+    def get_sdist_package_names(self, name):
+        return set([
+            name,
+            name.lower(),
+            name.replace('-', '_'),
+            name.replace('_', '-'),
+            name.title(),
+        ])
+
     def __init__(self, package_dir, packages):
         super().__init__(package_dir)
-        self._wanted = packages
+        self._all = packages
+
+    def _create_package_dir(self):
+        if not os.path.exists(self.package_dir):
+            self.emit("Creating package dir: %s" % (self.package_dir,))
+            os.mkdir(self.package_dir)
+
+    def filter_existing(self):
+        self._wanted = []
+        self._create_package_dir()
+        for package in self._all:
+             if package.pip_cache_file: continue
+             for package_name in self.get_sdist_package_names(package.pypi_name):
+                 package_glob = '{}-{}.*'.format(package_name, package.version)
+                 filepath = os.path.join(self.package_dir, package_glob)
+                 results = list(glob.glob(filepath))
+                 #print(filepath, results)
+                 if results:
+                     assert len(results) == 1
+                     package.pip_cache_file = results[0]
+                     break
+             if not results:
+                  print('{}=={} not found'.format(package.pypi_name, package.version))
+                  self._wanted.append(package)
 
     def iter_caches(self):
+        if not self._wanted:
+            return []
         for cached_package in super().iter_caches():
             if cached_package.is_package:
                 filename = cached_package.package_filename
@@ -873,14 +908,21 @@ class MyExtractor(Extractor):
                 except Exception as e:
                     print('Invalid version {} {} {}: {}'.format(cached_package.package_filename, vers, cached_package.filepath, e))
                 for package in self._wanted:
-                    if package.pypi_name == proj:
-                        if vers == package.version:
-                            yield cached_package
+                    for name in self.get_sdist_package_names(package.pypi_name):
+                         if name == proj:
+                            if vers == package.version:
+                                print('found {} {}: {}'.format(package.pypi_name, package.version, filename))
+                                yield cached_package
+                                break
+                            else:
+                                print('found non-matching {} {}: {}'.format(package.pypi_name, package.version, filename))
 
 
 extractor = MyExtractor('landinggear-output', packages)
-#extractor.extract_packages()
-#sys.exit(1)
+extractor.filter_existing()
+print(len(extractor._all), len(extractor._wanted))
+extractor.extract_packages()
+sys.exit(1)
 
 skip_packages = no_load_packages.copy()
 if skip_slow:
