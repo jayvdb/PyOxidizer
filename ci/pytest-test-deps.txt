@@ -1,10 +1,13 @@
 # This should be installed into a python3 venv, and its site-packages added to the PyOxidizer sys_path
 # python3 -m venv test-deps-venv
 # cd test-deps-venv
-# ./bin/python3 -m pip install -r ~/projects/python/PyOxidizer/ci/pytest-test-deps.txt
+# ./bin/pip install --upgrade pip
+# ./bin/pip install -r ~/projects/python/PyOxidizer/ci/pytest-test-deps.txt
 
 git+https://github.com/jayvdb/python-stdlib-list@pkgdata#egg=stdlib-list
 git+https://github.com/jayvdb/landinggear@tarballs#egg=landinggear
+# doesnt work git+https://github.com/jayvdb/dephell_archive@all#egg=dephell_archive
+dephell
 versionfinder
 test-runner
 pipgh

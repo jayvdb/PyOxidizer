@@ -917,11 +917,59 @@ class MyExtractor(Extractor):
                             else:
                                 print('found non-matching {} {}: {}'.format(package.pypi_name, package.version, filename))
 
+from pathlib import Path
+import glob
+import os
 
-extractor = MyExtractor('landinggear-output', packages)
+from dephell_archive import ArchivePath
+
+extract_path=Path('.', 'test-suites')
+
+sdists_dir = Path('.', 'landinggear-output')
+
+
+extractor = MyExtractor(str(sdists_dir), packages)
 extractor.filter_existing()
 print(len(extractor._all), len(extractor._wanted))
 extractor.extract_packages()
+
+
+sdists = glob.glob(str(sdists_dir) + '/*')
+
+for sdist in sorted(sdists):
+    if os.path.isdir(sdist): continue
+
+    #if 'cached-prop' in sdist: pass
+    #elif not sdist.endswith('.zip'): continue
+    #elif 'graphviz' not in sdist: continue
+
+    print(sdist)
+
+    path = ArchivePath(
+        archive_path=Path(sdist),
+        cache_path=extract_path,
+    )
+
+    basenames = list(path.iterdir(recursive=False))
+    # bug
+    #assert len(basenames) == 1
+    dirname, _, _ = str(basenames[0]).partition('/')
+    if os.path.exists(os.path.join(str(extract_path), dirname)):
+        print('{} already extracted'.format(dirname))
+        continue
+
+    for filename in path.iterdir(recursive=True):
+        print('processing {}'.format(filename))
+        if str(filename) == 'beautifulsoup4-4.8.1/NEWS.txt': continue
+        try:
+            with filename.open('rb') as f:
+                f.read()
+        except (KeyError, IsADirectoryError):
+            pass
+
+results = list(glob.glob('test-suites/*'))
+print(results)
+
 sys.exit(1)
 
 skip_packages = no_load_packages.copy()
